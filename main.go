@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const DATE_FORMAT = "2006-01-02"
+
 var db *sql.DB
 
 func main() {
@@ -93,11 +95,45 @@ func setupRoutes(r *gin.Engine) {
 	r.POST("/Api/Meal/Upload", uploadWeeklyMeal)
 	r.GET("/Api/Meal/Today", getTodayMeal)
 	r.POST("/Api/Donation", donateMeal)
+	r.GET("/Api/Donation/Available", getDonations)
+}
+
+func getDonations(context *gin.Context) {
+	var donations []Donation
+
+	today := time.Now().Format(DATE_FORMAT)
+	rows, err := db.Query("SELECT DISTINCT description, name FROM donation WHERE claimed = 0 AND date = ? GROUP BY description ORDER BY description", today)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var donation Donation
+		err := rows.Scan(&donation.Description, &donation.Name)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      err.Error(),
+			})
+		}
+		donations = append(donations, donation)
+	}
+
+	context.JSON(http.StatusOK, ApiResult{
+		StatusCode: http.StatusOK,
+		Data:       donations,
+	})
+
 }
 
 func donateMeal(context *gin.Context) {
-	var meal Donation
-	err := context.BindJSON(&meal)
+	var donation Donation
+	err := context.BindJSON(&donation)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, ApiResult{
 			StatusCode: http.StatusBadRequest,
@@ -106,7 +142,7 @@ func donateMeal(context *gin.Context) {
 		return
 	}
 
-	_, err = db.Exec("INSERT INTO donation (name, description) VALUES (?, ?)", meal.Name, meal.Description)
+	_, err = db.Exec("INSERT INTO donation (name, description) VALUES (?, ?)", donation.Name, donation.Description)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -121,7 +157,8 @@ func donateMeal(context *gin.Context) {
 
 func getTodayMeal(context *gin.Context) {
 	var meals []Meal
-	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date = ?", time.Now().Format("2006-01-02"))
+	today := time.Now().Format(DATE_FORMAT)
+	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date = ?", today)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -138,7 +175,7 @@ func getTodayMeal(context *gin.Context) {
 				Error:      err.Error(),
 			})
 		}
-		meal.Date = time.Now().Format("2006-01-02")
+		meal.Date = time.Now().Format(DATE_FORMAT)
 		meals = append(meals, meal)
 	}
 
@@ -232,7 +269,7 @@ func getMeals(context *gin.Context) {
 	}
 
 	var meals []Meal
-	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date >= ? AND date <= ?", startDate, endDate)
+	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date >= ? AND date <= ? ORDER BY description", startDate, endDate)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -259,7 +296,7 @@ func getMeals(context *gin.Context) {
 				Error:      err.Error(),
 			})
 		}
-		meal.Date = date.Format("2006-01-02")
+		meal.Date = date.Format(DATE_FORMAT)
 		meals = append(meals, meal)
 	}
 
