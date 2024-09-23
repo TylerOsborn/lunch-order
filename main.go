@@ -7,18 +7,23 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
-	"lunchorder/db"
 	"net/http"
 	"strings"
 	"time"
 )
 
-var DB *sql.DB
+var db *sql.DB
 
 func main() {
 	// DB setup
-	DB = db.SetupDB()
-	defer DB.Close()
+	fmt.Println("Setting up db...")
+	var err error
+	db, err = sql.Open("sqlite3", "./database.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	initDB()
+	defer db.Close()
 
 	// Route setup
 	r := gin.Default()
@@ -39,6 +44,44 @@ func setupCors(r *gin.Engine) {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
+}
+
+func initDB() {
+
+	sqlStmt := `
+CREATE TABLE IF NOT EXISTS meal_type (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    description TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS  meal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL,
+    date DATE NOT NULL,
+    FOREIGN KEY (type_id) REFERENCES meal_type (id)
+);
+
+CREATE TABLE IF NOT EXISTS donation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meal_id INTEGER NOT NULL,
+    donor_name TEXT NOT NULL,
+    claimed BOOLEAN NOT NULL DEFAULT 0,
+    FOREIGN KEY (meal_id) REFERENCES meal (id)
+);
+
+CREATE TABLE IF NOT EXISTS claim (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    donation_id INTEGER,
+    claimer_name TEXT NOT NULL,
+    fulfilled BOOLEAN NOT NULL DEFAULT 0,
+    FOREIGN KEY (donation_id) REFERENCES donation (id)
+);
+	`
+	_, err := db.Exec(sqlStmt)
+	if err != nil {
+		log.Printf("%q: %s\n", err, sqlStmt)
+		return
+	}
 }
 
 func setupFrontEnd(r *gin.Engine) {
@@ -77,7 +120,7 @@ func getMeals(g *gin.Context) {
 	}
 
 	var meals []Meal
-	rows, err := DB.Query("SELECT * FROM meal WHERE date >= ? AND date <= ?", startDate, endDate)
+	rows, err := db.Query("SELECT * FROM meal WHERE date >= ? AND date <= ?", startDate, endDate)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -114,7 +157,7 @@ func getMeals(g *gin.Context) {
 
 func getMealTypes(g *gin.Context) {
 	var mealTypes []MealType
-	rows, err := DB.Query("SELECT * FROM meal_type")
+	rows, err := db.Query("SELECT * FROM meal_type")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +192,7 @@ func createMealType(g *gin.Context) {
 		return
 	}
 
-	stmt, err := DB.Prepare("INSERT INTO meal_type(description) VALUES(?)")
+	stmt, err := db.Prepare("INSERT INTO meal_type(description) VALUES(?)")
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -191,7 +234,7 @@ func getMenu(g *gin.Context) {
 
 	sqlQuery := "SELECT strftime('%Y-%m-%d', date) AS date, description FROM meal INNER JOIN meal_type ON meal.type_id = meal_type.id WHERE date >= ? AND date <= DATE(?, '+5 day')"
 
-	rows, err := DB.Query(sqlQuery, startDate, startDate)
+	rows, err := db.Query(sqlQuery, startDate, startDate)
 	if err != nil {
 		g.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -242,6 +285,7 @@ type Claim struct {
 	Id          int    `json:"id"`
 	DonationId  int    `json:"donationId"`
 	ClaimerName string `json:"claimerName"`
+	Fulfilled   bool   `json:"fulfilled"`
 }
 
 type ApiResult struct {
