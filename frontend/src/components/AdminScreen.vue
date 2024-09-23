@@ -64,11 +64,6 @@ export default {
       const zero = places - num.toString().length + 1;
       return Array(+(zero > 0 && zero)).join("0") + num;
     },
-    addDays(date, days) {
-      const result = new Date(date);
-      result.setDate(result.getDate() + days);
-      return result;
-    }
   },
   computed: {
     mondayDate() {
