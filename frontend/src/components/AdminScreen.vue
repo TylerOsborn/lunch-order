@@ -10,7 +10,7 @@ import Divider from 'primevue/divider';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Textarea from 'primevue/textarea';
-import Button from 'primevue/Button';
+import Button from 'primevue/button';
 
 
 export default {

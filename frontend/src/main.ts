@@ -4,6 +4,7 @@ import './style.css'
 import App from './App.vue'
 import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
+import ToastService from 'primevue/toastservice';
 import HomeScreen from './components/HomeScreen.vue'
 import GiveMealScreen from './components/GiveMealScreen.vue'
 import ReceiveMealScreen from './components/ReceiveMealScreen.vue'
@@ -23,10 +24,12 @@ const router = createRouter({
 
 const app = createApp(App)
 app.use(router)
-app.mount('#app')
+app.use(ToastService);
 
 app.use(PrimeVue, {
     theme: {
         preset: Aura
     }
 });
+
+app.mount('#app')

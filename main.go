@@ -33,7 +33,10 @@ func main() {
 	setupRoutes(r)
 
 	// Start server
-	r.Run(":8080")
+	err = r.Run(":8080")
+	if err != nil {
+		return
+	}
 }
 
 func setupCors(r *gin.Engine) {
@@ -53,6 +56,16 @@ CREATE TABLE IF NOT EXISTS  meal (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     description TEXT NOT NULL,
     date DATE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS donation
+(
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        VARCHAR(255),
+    description TEXT,
+    claimed     BOOLEAN DEFAULT FALSE,
+    date        DATE    DEFAULT CURRENT_DATE,
+    doe         DATETIME   DEFAULT CURRENT_TIMESTAMP
 );
 	`
 	_, err := db.Exec(sqlStmt)
@@ -79,6 +92,31 @@ func setupRoutes(r *gin.Engine) {
 	r.GET("/Api/Meal", getMeals)
 	r.POST("/Api/Meal/Upload", uploadWeeklyMeal)
 	r.GET("/Api/Meal/Today", getTodayMeal)
+	r.POST("/Api/Donation", donateMeal)
+}
+
+func donateMeal(context *gin.Context) {
+	var meal Donation
+	err := context.BindJSON(&meal)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, ApiResult{
+			StatusCode: http.StatusBadRequest,
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	_, err = db.Exec("INSERT INTO donation (name, description) VALUES (?, ?)", meal.Name, meal.Description)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+	}
+
+	context.JSON(http.StatusOK, ApiResult{
+		StatusCode: http.StatusOK,
+	})
 }
 
 func getTodayMeal(context *gin.Context) {
@@ -235,6 +273,13 @@ func getMeals(context *gin.Context) {
 type Meal struct {
 	Id          int    `json:"id"`
 	Description string `json:"description"`
+	Date        string `json:"date"`
+}
+
+type Donation struct {
+	Id          int    `json:"id"`
+	Description string `json:"description"`
+	Name        string `json:"name"`
 	Date        string `json:"date"`
 }
 
