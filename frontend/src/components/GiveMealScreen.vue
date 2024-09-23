@@ -9,7 +9,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import Select from 'primevue/select';
 import FloatLabel from 'primevue/floatlabel';
 import Button from 'primevue/button';

@@ -11,7 +11,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import Listbox from 'primevue/listbox';
 import Button from 'primevue/button';
 

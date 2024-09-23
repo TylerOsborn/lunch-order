@@ -7,11 +7,13 @@ import Aura from '@primevue/themes/aura';
 import HomeScreen from './components/HomeScreen.vue'
 import GiveMealScreen from './components/GiveMealScreen.vue'
 import ReceiveMealScreen from './components/ReceiveMealScreen.vue'
+import AdminScreen from './components/AdminScreen.vue'
 
 const routes = [
     { path: '/', component: HomeScreen },
     { path: '/give-meal', component: GiveMealScreen },
-    { path: '/receive-meal', component: ReceiveMealScreen }
+    { path: '/receive-meal', component: ReceiveMealScreen },
+    { path: '/admin', component: AdminScreen }
 ]
 
 const router = createRouter({

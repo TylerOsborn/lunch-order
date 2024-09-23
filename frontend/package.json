@@ -1,5 +1,5 @@
 {
-  "name": "lunch-order",
+  "name": "frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,6 @@
     "@primevue/themes": "^4.0.7",
     "axios": "^1.7.7",
     "primevue": "^4.0.7",
-    "radix-vue": "^1.9.6",
     "vue": "^3.4.37",
     "vue-router": "^4.4.5"
   },
