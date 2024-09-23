@@ -78,6 +78,36 @@ func setupFrontEnd(r *gin.Engine) {
 func setupRoutes(r *gin.Engine) {
 	r.GET("/Api/Meal", getMeals)
 	r.POST("/Api/Meal/Upload", uploadWeeklyMeal)
+	r.GET("/Api/Meal/Today", getTodayMeal)
+}
+
+func getTodayMeal(context *gin.Context) {
+	var meals []Meal
+	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date = ?", time.Now().Format("2006-01-02"))
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+	}
+
+	for rows.Next() {
+		var meal Meal
+		err := rows.Scan(&meal.Id, &meal.Description, &meal.Date)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      err.Error(),
+			})
+		}
+		meal.Date = time.Now().Format("2006-01-02")
+		meals = append(meals, meal)
+	}
+
+	context.JSON(http.StatusOK, ApiResult{
+		StatusCode: http.StatusOK,
+		Data:       meals,
+	})
 }
 
 type MealUpload struct {
@@ -164,7 +194,7 @@ func getMeals(context *gin.Context) {
 	}
 
 	var meals []Meal
-	rows, err := db.Query("SELECT * FROM meal WHERE date >= ? AND date <= ?", startDate, endDate)
+	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date >= ? AND date <= ?", startDate, endDate)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -178,7 +208,10 @@ func getMeals(context *gin.Context) {
 		var meal Meal
 		err := rows.Scan(&meal.Id, &meal.Description, &meal.Date)
 		if err != nil {
-			log.Fatal(err)
+			context.JSON(http.StatusInternalServerError, ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      err.Error(),
+			})
 		}
 
 		date, err := time.Parse(time.RFC3339, meal.Date)

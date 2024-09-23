@@ -1,6 +1,7 @@
 <script lang="ts">
 import api from "../axios/axios.ts";
 import {ApiResult, Meal } from "../models/models.ts";
+import {mondayDate, thursdayDate} from "../utils/utils.ts";
 
 import Card from 'primevue/card';
 import Listbox from 'primevue/listbox';
@@ -38,14 +39,17 @@ export default {
       api.post('/Api/Meal/Upload', { csv: this.newMeals })
           .then(response => {
             console.log('Meal uploaded:', response.data);
+          })
+          .then(() => {
             this.getMeals();
+            this.newMeals = '';
           })
           .catch(error => {
             console.log(error);
           });
     },
     getMeals() {
-      api.get(`/Api/Meal?startDate=${this.mondayDate}&endDate=${this.thursdayDate}`)
+      api.get(`/Api/Meal?startDate=${this.monday}&endDate=${this.thursday}`)
           .then(response => {
             let result: ApiResult<Meal[]> = response.data;
             this.meals = result.data;
@@ -54,31 +58,13 @@ export default {
             console.log(error);
           });
     },
-    zeroPad(num, places) {
-      const zero = places - num.toString().length + 1;
-      return Array(+(zero > 0 && zero)).join("0") + num;
-    },
   },
   computed: {
-    mondayDate() {
-      const today = new Date();
-      const day = today.getDay();
-      const diff = today.getDate() - day + (day == 0 ? -6 : 1);
-      const monday = new Date(today.setDate(diff))
-      const year = this.zeroPad(monday.getFullYear(), 4);
-      const month = this.zeroPad(monday.getMonth() + 1, 2);
-      const date = this.zeroPad(monday.getDate(), 2);
-      return `${year}-${month}-${date}`
+    monday() {
+      return mondayDate();
     },
-    thursdayDate() {
-      const today = new Date();
-      const day = today.getDay();
-      const diff = today.getDate() - day + (day == 0 ? -6 : 4);
-      const monday = new Date(today.setDate(diff))
-      const year = this.zeroPad(monday.getFullYear(), 4);
-      const month = this.zeroPad(monday.getMonth() + 1, 2);
-      const date = this.zeroPad(monday.getDate(), 2);
-      return `${year}-${month}-${date}`
+    thursday() {
+      return thursdayDate();
     },
   }
 }
