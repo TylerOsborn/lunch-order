@@ -9,3 +9,10 @@ export interface Meal {
     description: string;
     date: string;
 }
+
+export interface Donation {
+    id: number;
+    name: string;
+    description: string;
+    date: string;
+}

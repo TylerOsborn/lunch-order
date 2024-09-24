@@ -54,7 +54,8 @@ func setupCors(r *gin.Engine) {
 func initDB() {
 
 	sqlStmt := `
-CREATE TABLE IF NOT EXISTS  meal (
+CREATE TABLE IF NOT EXISTS  meal 
+(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     description TEXT NOT NULL,
     date DATE NOT NULL
@@ -69,6 +70,14 @@ CREATE TABLE IF NOT EXISTS donation
     date        DATE    DEFAULT CURRENT_DATE,
     doe         DATETIME   DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS donation_claim
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    donation_id INT,
+    name VARCHAR(255),
+    doe DATETIME DEFAULT CURRENT_TIMESTAMP
+)
 	`
 	_, err := db.Exec(sqlStmt)
 	if err != nil {
@@ -92,17 +101,64 @@ func setupFrontEnd(r *gin.Engine) {
 
 func setupRoutes(r *gin.Engine) {
 	r.GET("/Api/Meal", getMeals)
+
 	r.POST("/Api/Meal/Upload", uploadWeeklyMeal)
 	r.GET("/Api/Meal/Today", getTodayMeal)
+
 	r.POST("/Api/Donation", donateMeal)
-	r.GET("/Api/Donation/Available", getDonations)
+	r.GET("/Api/Donation", getDonations)
+
+	r.POST("/Api/Donation/Claim", claimDonation)
+}
+
+func claimDonation(context *gin.Context) {
+	var donationClaim DonationClaim
+	err := context.BindJSON(&donationClaim)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, ApiResult{
+			StatusCode: http.StatusBadRequest,
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	result, err := db.Exec("UPDATE donation SET claimed = 1 WHERE id = ?", donationClaim.DonationId)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		context.JSON(http.StatusBadRequest, ApiResult{
+			StatusCode: http.StatusBadRequest,
+			Error:      "Donation not found",
+		})
+		return
+	}
+
+	_, err = db.Exec("INSERT INTO donation_claim (donation_id, name) VALUES (?, ?)", donationClaim.DonationId, donationClaim.Name)
+
+	if err != nil {
+		context.JSON(http.StatusOK, ApiResult{
+			StatusCode: http.StatusOK,
+			Error:      "Meal was allocated but the follwing error was produced: " + err.Error(),
+		})
+	}
+
+	context.JSON(http.StatusOK, ApiResult{
+		StatusCode: http.StatusOK,
+	})
 }
 
 func getDonations(context *gin.Context) {
 	var donations []Donation
 
 	today := time.Now().Format(DATE_FORMAT)
-	rows, err := db.Query("SELECT DISTINCT description, name FROM donation WHERE claimed = 0 AND date = ? GROUP BY description ORDER BY description", today)
+	rows, err := db.Query("SELECT DISTINCT description, name, id FROM donation WHERE claimed = 0 AND date = ? GROUP BY description ORDER BY description", today)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -114,7 +170,7 @@ func getDonations(context *gin.Context) {
 
 	for rows.Next() {
 		var donation Donation
-		err := rows.Scan(&donation.Description, &donation.Name)
+		err := rows.Scan(&donation.Description, &donation.Name, &donation.Id)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, ApiResult{
 				StatusCode: http.StatusInternalServerError,
@@ -318,6 +374,14 @@ type Donation struct {
 	Description string `json:"description"`
 	Name        string `json:"name"`
 	Date        string `json:"date"`
+	Doe         string `json:"doe"`
+}
+
+type DonationClaim struct {
+	Id         int    `json:"id"`
+	DonationId int    `json:"donationId"`
+	Name       string `json:"name"`
+	Doe        string `json:"doe"`
 }
 
 type ApiResult struct {
