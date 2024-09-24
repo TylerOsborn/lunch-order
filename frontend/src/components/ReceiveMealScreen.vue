@@ -37,7 +37,7 @@ export default {
   },
   data() {
     return {
-      availableMeals: [] as string[] | null,
+      availableMeals: [] as Donation[] | null,
       selectedDonation: {
         description: 'Meal',
         name: 'John Doe',
@@ -64,7 +64,7 @@ export default {
     handleOkayButton() {
       this.$router.push('/');
     },
-    selectMeal(donation) {
+    selectMeal(donation: Donation) {
       api.post('/Api/Donation/Claim', {
         donationId: donation.id,
         name: this.name

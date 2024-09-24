@@ -21,7 +21,7 @@ func main() {
 	// DB setup
 	fmt.Println("Setting up db...")
 	var err error
-	db, err = sql.Open("sqlite3", "./database.db")
+	db, err = sql.Open("sqlite3", "./database/database.db")
 	if err != nil {
 		log.Fatal(err)
 	}
