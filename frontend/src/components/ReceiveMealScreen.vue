@@ -52,7 +52,7 @@ export default {
   },
   methods: {
     getAvailableMeals() {
-      api.get('/Api/Donation')
+      api.get(`/Api/Donation?timestamp=${new Date().getTime()}`)
           .then(response => {
             let result: ApiResult<Donation[]> = response.data;
             this.availableMeals = result.data;
