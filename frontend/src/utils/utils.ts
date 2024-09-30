@@ -24,6 +24,14 @@ export function thursdayDate() {
     return `${year}-${month}-${date}`
 }
 
+export function getTodayDate() {
+    const today = new Date();
+    const year = zeroPad(today.getFullYear(), 4);
+    const month = zeroPad(today.getMonth() + 1, 2);
+    const date = zeroPad(today.getDate(), 2);
+    return `${year}-${month}-${date}`
+}
+
 export function setNameCookie(name: string) {
     const d = new Date();
     d.setTime(d.getTime() + (365*24*60*60*1000)); // 1 year expiration

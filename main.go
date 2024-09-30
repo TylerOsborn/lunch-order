@@ -109,6 +109,52 @@ func setupRoutes(r *gin.Engine) {
 	r.GET("/Api/Donation", getDonations)
 
 	r.POST("/Api/Donation/Claim", claimDonation)
+
+	r.GET("/Api/Stats/Claims/Summary", getClaimsSummaryToday)
+}
+
+func getClaimsSummaryToday(context *gin.Context) {
+	date := context.Query("date")
+
+	if date == "" {
+		date = time.Now().Format(DATE_FORMAT)
+	}
+
+	var donationClaimSummaries []DonationClaimSummary
+
+	rows, err := db.Query("SELECT donation.claimed AS claimed, donation.description AS decription, donation.name AS donator_name, COALESCE(donation_claim.name, 'UNCLAIMED') AS claimer_name FROM donation LEFT JOIN donation_claim ON donation.id = donation_claim.donation_id WHERE donation.date = ?", date)
+
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var donationClaimSummary DonationClaimSummary
+		err := rows.Scan(&donationClaimSummary.Claimed, &donationClaimSummary.Description, &donationClaimSummary.DonatorName, &donationClaimSummary.ClaimerName)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      err.Error(),
+			})
+		}
+
+		if donationClaimSummary.ClaimerName != "" {
+			donationClaimSummary.Claimed = true
+		}
+
+		donationClaimSummaries = append(donationClaimSummaries, donationClaimSummary)
+	}
+
+	context.JSON(http.StatusOK, ApiResult{
+		StatusCode: http.StatusOK,
+		Data:       donationClaimSummaries,
+	})
+
 }
 
 func claimDonation(context *gin.Context) {
@@ -388,4 +434,11 @@ type ApiResult struct {
 	StatusCode int         `json:"statusCode"`
 	Error      string      `json:"error"`
 	Data       interface{} `json:"data"`
+}
+
+type DonationClaimSummary struct {
+	Claimed     bool   `json:"claimed"`
+	Description string `json:"description"`
+	DonatorName string `json:"donatorName"`
+	ClaimerName string `json:"claimerName"`
 }

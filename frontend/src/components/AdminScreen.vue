@@ -1,7 +1,7 @@
 <script lang="ts">
 import api from "../axios/axios.ts";
-import {ApiResult, Meal } from "../models/models.ts";
-import {mondayDate, thursdayDate} from "../utils/utils.ts";
+import {ApiResult, DonationClaimSummary, Meal} from "../models/models.ts";
+import {getTodayDate, mondayDate, thursdayDate} from "../utils/utils.ts";
 
 import Card from 'primevue/card';
 import Listbox from 'primevue/listbox';
@@ -28,11 +28,13 @@ export default {
   data() {
     return {
       meals: [] as Meal[],
-      newMeals: '' as string
+      newMeals: '' as string,
+      claimsSummary: [] as DonationClaimSummary[]
     }
   },
   mounted() {
     this.getMeals();
+    this.getClaimsSummary();
   },
   methods: {
     submitMeal() {
@@ -58,6 +60,20 @@ export default {
             console.log(error);
           });
     },
+    getClaimsSummary() {
+      api.get(`/Api/Stats/Claims/Summary?date=${this.today}&timestamp=${new Date().getTime()}`)
+          .then(response => {
+            let result: ApiResult<DonationClaimSummary[]> = response.data;
+            if (result.error) {
+              this.$toast.add({ severity: 'error', summary: 'Error', detail: result.error });
+              return;
+            }
+            this.claimsSummary = result.data;
+          })
+          .catch(error => {
+            this.$toast.add({ severity: 'error', summary: 'Error', detail: `Error: ${error}`});
+          });
+    }
   },
   computed: {
     monday() {
@@ -66,12 +82,32 @@ export default {
     thursday() {
       return thursdayDate();
     },
+    today() {
+      return getTodayDate();
+    }
   }
 }
 </script>
 
 <template>
   <div class="container">
+    <Card class="card">
+      <template #title>
+        <h2>
+          Daily Summary
+        </h2>
+      </template>
+      <template #content>
+        <div style="height: inherit;">
+          <DataTable scrollable scrollHeight="400px" :value="claimsSummary">
+            <Column field="claimed" header="Claimed"/>
+            <Column field="description" header="Description"/>
+            <Column field="donatorName" header="Donator"/>
+            <Column field="claimerName" header="Claimer"/>
+          </DataTable>
+        </div>
+      </template>
+    </Card>
     <Card class="card">
       <template #title>
         <h2>
