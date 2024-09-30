@@ -5,8 +5,14 @@
       <p>There are no meals available at the moment.</p>
     </div>
     <div class="flex" v-else>
-      <InputText class="full-width" placeholder="Name" id="name" v-model="name"/>
-      <Listbox v-model="selectedDonation" :options="availableMeals" optionLabel="description"/>
+      <div class="flex-left full-width">
+        <InputText class="full-width" :invalid="userNameInputErrorText !== ''" placeholder="Name" id="name" v-model="name"/>
+        <small v-if="userNameInputErrorText !== ''" class="error-text">{{ userNameInputErrorText }}</small>
+      </div>
+      <div class="flex-left full-width">
+        <Listbox v-model="selectedDonation" :invalid="mealInputErrorText !== ''" :options="availableMeals" optionLabel="description"/>
+        <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
+      </div>
       <Button @click="selectMeal(selectedDonation)" class="full-width">
         Select Option
       </Button>
@@ -43,7 +49,10 @@ export default {
         name: 'John Doe',
       } as Donation,
       name: '' as string,
-      dialogVisible: false as boolean
+      dialogVisible: false as boolean,
+
+      userNameInputErrorText: '',
+      mealInputErrorText: '',
     }
   },
   mounted() {
@@ -64,7 +73,37 @@ export default {
     handleOkayButton() {
       this.$router.push('/');
     },
+    validateDonationClaim(name: string, donation: Donation): boolean {
+      let valid = true;
+
+      const id = donation?.id;
+      const description = donation?.description;
+
+      if (!name || name.trim() === '') {
+        this.userNameInputErrorText = 'Please enter a name';
+        valid = valid && false;
+      } else if (!/^(\w+\s?){1,5}$/.test(name)) {
+        this.userNameInputErrorText = 'Please enter a valid name';
+        valid = valid && false;
+      } else {
+        this.userNameInputErrorText = '';
+      }
+
+      if (id == null || id <= 0 || description == null ||  description.trim() === '') {
+        this.mealInputErrorText = 'Please select a meal';
+        valid = valid && false;
+      } else {
+        this.mealInputErrorText = '';
+      }
+
+      return valid;
+    },
     selectMeal(donation: Donation) {
+      const valid = this.validateDonationClaim(this.name, donation);
+      if (!valid) {
+        return;
+      }
+
       api.post('/Api/Donation/Claim', {
         donationId: donation.id,
         name: this.name
@@ -98,5 +137,15 @@ export default {
   gap: 1rem;
   justify-content: center;
   align-items: center;
+}
+
+.flex-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: left;
+}
+
+.error-text {
+  text-align: left;
 }
 </style>
