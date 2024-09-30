@@ -65,8 +65,7 @@ export default {
       if (!name || name.trim() === '') {
         this.userNameInputErrorText = 'Please enter a name';
         valid = valid && false;
-      } else if (!/^(\w+\s?){1,3}$/.test(name)) {
-        console.log('name', name);
+      } else if (!/^(\w+\s?){1,5}$/.test(name)) {
         this.userNameInputErrorText = 'Please enter a valid name';
         valid = valid && false;
       } else {
