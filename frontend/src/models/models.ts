@@ -16,3 +16,10 @@ export interface Donation {
     description: string;
     date: string;
 }
+
+export interface DonationClaimSummary {
+    claimed: boolean;
+    description: string;
+    donatorName: string;
+    claimerName: string;
+}
