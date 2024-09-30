@@ -25,7 +25,7 @@ import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import api from "../axios/axios.ts";
 import {ApiResult, Donation} from "../models/models.ts";
-import {getNameFromCookie} from "../utils/utils.ts";
+import {getNameFromCookie, setNameCookie} from "../utils/utils.ts";
 
 export default {
   name: 'ReceiveMealScreen',
@@ -81,6 +81,7 @@ export default {
             this.$toast.add({severity: 'error', summary: 'Error', detail: 'Unable to claim meal', life: 3000});
             this.getAvailableMeals();
           });
+      setNameCookie(this.name);
     }
   }
 }

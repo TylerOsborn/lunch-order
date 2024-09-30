@@ -62,7 +62,7 @@ export default {
           .catch(_ => {
             this.$toast.add({severity: 'error', summary: 'Error', detail: 'Unable to donate meal', life: 3000});
           });
-      setNameCookie(this.name)
+      setNameCookie(this.name);
     }
   }
 }
