@@ -2,9 +2,16 @@
   <div class="give-meal-screen">
     <h2>Give a Meal</h2>
     <form class="flex" @submit.prevent="submitMeal">
-      <InputText class="full-width" placeholder="Name" id="name" v-model="name"/>
-      <Listbox class="full-width" size v-model="selectedMealType" :options="meals" optionValue="description"
-               optionLabel="description" placeholder="Select..." id="meal" required/>
+      <div class="flex-left full-width">
+        <InputText class="full-width" :invalid="userNameInputErrorText !== ''" placeholder="Name" id="name" v-model="name"/>
+        <small v-if="userNameInputErrorText !== ''" id="name-help" class="error-text" >{{ userNameInputErrorText }}</small>
+      </div>
+      <div class="flex-left full-width">
+        <Listbox class="full-width" :invalid="mealInputErrorText != ''" size v-model="selectedMealType" :options="meals" optionValue="description"
+                 optionLabel="description" placeholder="Select..." id="meal" required/>
+        <small v-if="mealInputErrorText !== ''" class="error-text" >{{ mealInputErrorText }}</small>
+      </div>
+
       <Button class="full-width" type="submit">Submit</Button>
     </form>
   </div>
@@ -31,7 +38,10 @@ export default {
     return {
       name: '',
       selectedMealType: '',
-      meals: [] as Meal[]
+      meals: [] as Meal[],
+
+      userNameInputErrorText: '',
+      mealInputErrorText: '',
     }
   },
   mounted() {
@@ -49,7 +59,34 @@ export default {
             this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal options', life: 3000 });
           });
     },
+    validateDonationForm(name: string, selectedMealType: string): boolean {
+      let valid = true;
+
+      if (!name || name.trim() === '') {
+        this.userNameInputErrorText = 'Please enter a name';
+        valid = valid && false;
+      } else if (!/^(\w+\s?){1,3}$/.test(name)) {
+        console.log('name', name);
+        this.userNameInputErrorText = 'Please enter a valid name';
+        valid = valid && false;
+      } else {
+        this.userNameInputErrorText = '';
+      }
+
+      if (!selectedMealType || selectedMealType.trim() === '') {
+        this.mealInputErrorText = 'Please select a meal';
+        valid = valid && false;
+      } else {
+        this.mealInputErrorText = '';
+      }
+
+      return valid;
+    },
     submitMeal() {
+      const valid = this.validateDonationForm(this.name, this.selectedMealType);
+      if (!valid) {
+        return;
+      }
       api.post("/Api/Donation", {name: this.name, description: this.selectedMealType})
           .then(response => {
             if (response.status === 200) {
@@ -77,7 +114,17 @@ export default {
   align-items: center;
 }
 
+.flex-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: left;
+}
+
 .full-width {
   width: 100%;
+}
+
+.error-text {
+  text-align: left;
 }
 </style>
