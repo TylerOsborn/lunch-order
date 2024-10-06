@@ -33,7 +33,7 @@ func (r *DonationRepository) CreateDonation(donation *Donation) error {
 }
 
 func (r *DonationRepository) ClaimDonation(donationId int) (bool, error) {
-	result, err := r.db.Exec("UPDATE donation SET claimed = 1 WHERE id = ?", donationId)
+	result, err := r.db.Exec("UPDATE donation SET claimed = 1 WHERE id = ? AND claimed = 0", donationId)
 	if err != nil {
 		log.Println("Failed to claim donation:", err)
 		return false, err
