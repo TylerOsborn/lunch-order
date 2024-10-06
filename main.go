@@ -4,18 +4,24 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
+	"lunchorder/constants"
+	"lunchorder/models"
+	"lunchorder/repository"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-const DATE_FORMAT = "2006-01-02"
-
 var db *sql.DB
+
+var donationRepository *repository.DonationRepository
+var mealRepository *repository.MealRepository
+var donationClaimRepository *repository.DonationClaimRepository
 
 func main() {
 	// DB setup
@@ -27,6 +33,10 @@ func main() {
 	}
 	initDB()
 	defer db.Close()
+
+	donationRepository = repository.NewDonationRepository(db)
+	mealRepository = repository.NewMealRepository(db)
+	donationClaimRepository = repository.NewDonationClaimRepository(db)
 
 	// Route setup
 	r := gin.Default()
@@ -117,15 +127,15 @@ func getClaimsSummaryToday(context *gin.Context) {
 	date := context.Query("date")
 
 	if date == "" {
-		date = time.Now().Format(DATE_FORMAT)
+		date = time.Now().Format(constants.DATE_FORMAT)
 	}
 
-	var donationClaimSummaries []DonationClaimSummary
+	var donationClaimSummaries []models.DonationClaimSummary
 
 	rows, err := db.Query("SELECT donation.claimed AS claimed, donation.description AS decription, donation.name AS donator_name, COALESCE(donation_claim.name, 'UNCLAIMED') AS claimer_name FROM donation LEFT JOIN donation_claim ON donation.id = donation_claim.donation_id WHERE donation.date = ?", date)
 
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, ApiResult{
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
@@ -134,23 +144,23 @@ func getClaimsSummaryToday(context *gin.Context) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var donationClaimSummary DonationClaimSummary
+		var donationClaimSummary models.DonationClaimSummary
 		err := rows.Scan(&donationClaimSummary.Claimed, &donationClaimSummary.Description, &donationClaimSummary.DonatorName, &donationClaimSummary.ClaimerName)
 		if err != nil {
-			context.JSON(http.StatusInternalServerError, ApiResult{
+			context.JSON(http.StatusInternalServerError, models.ApiResult{
 				StatusCode: http.StatusInternalServerError,
 				Error:      err.Error(),
 			})
 		}
 
-		if donationClaimSummary.ClaimerName != "" {
+		if donationClaimSummary.ClaimerName != "UNCLAIMED" {
 			donationClaimSummary.Claimed = true
 		}
 
 		donationClaimSummaries = append(donationClaimSummaries, donationClaimSummary)
 	}
 
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 		Data:       donationClaimSummaries,
 	})
@@ -158,75 +168,62 @@ func getClaimsSummaryToday(context *gin.Context) {
 }
 
 func claimDonation(context *gin.Context) {
-	var donationClaim DonationClaim
+	var donationClaim models.DonationClaim
 	err := context.BindJSON(&donationClaim)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, ApiResult{
+		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
 		})
 		return
 	}
 
-	result, err := db.Exec("UPDATE donation SET claimed = 1 WHERE id = ?", donationClaim.DonationId)
+	success, err := donationRepository.ClaimDonation(donationClaim.DonationId)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, ApiResult{
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
 		return
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil || rowsAffected == 0 {
-		context.JSON(http.StatusBadRequest, ApiResult{
+	if !success {
+		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      "Donation not found",
 		})
 		return
 	}
 
-	_, err = db.Exec("INSERT INTO donation_claim (donation_id, name) VALUES (?, ?)", donationClaim.DonationId, donationClaim.Name)
+	err = donationClaimRepository.CreateDonationClaim(&donationClaim)
 
 	if err != nil {
-		context.JSON(http.StatusOK, ApiResult{
+		context.JSON(http.StatusOK, models.ApiResult{
 			StatusCode: http.StatusOK,
-			Error:      "Meal was allocated but the follwing error was produced: " + err.Error(),
+			Error:      "Meal was allocated but the following error was produced: " + err.Error(),
 		})
 	}
 
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 	})
 }
 
 func getDonations(context *gin.Context) {
-	var donations []Donation
+	var donations []models.Donation
 
-	today := time.Now().Format(DATE_FORMAT)
-	rows, err := db.Query("SELECT DISTINCT description, name, id FROM donation WHERE claimed = 0 AND date = ? GROUP BY description ORDER BY description", today)
+	today := time.Now().Format(constants.DATE_FORMAT)
+	
+	donations, err := donationRepository.GetUnclaimedDonationsByDate(today)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, ApiResult{
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
+		return
 	}
 
-	defer rows.Close()
-
-	for rows.Next() {
-		var donation Donation
-		err := rows.Scan(&donation.Description, &donation.Name, &donation.Id)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      err.Error(),
-			})
-		}
-		donations = append(donations, donation)
-	}
-
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 		Data:       donations,
 	})
@@ -234,54 +231,43 @@ func getDonations(context *gin.Context) {
 }
 
 func donateMeal(context *gin.Context) {
-	var donation Donation
+	var donation models.Donation
 	err := context.BindJSON(&donation)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, ApiResult{
+		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
 		})
 		return
 	}
 
-	_, err = db.Exec("INSERT INTO donation (name, description) VALUES (?, ?)", donation.Name, donation.Description)
+	err = donationRepository.CreateDonation(&donation)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, ApiResult{
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
+		return
 	}
 
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 	})
 }
 
 func getTodayMeal(context *gin.Context) {
-	var meals []Meal
-	today := time.Now().Format(DATE_FORMAT)
-	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date = ?", today)
+	var meals []models.Meal
+	today := time.Now().Format(constants.DATE_FORMAT)
+
+	meals, err := mealRepository.GetMealsByDate(today)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, ApiResult{
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
 	}
 
-	for rows.Next() {
-		var meal Meal
-		err := rows.Scan(&meal.Id, &meal.Description, &meal.Date)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      err.Error(),
-			})
-		}
-		meal.Date = time.Now().Format(DATE_FORMAT)
-		meals = append(meals, meal)
-	}
-
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 		Data:       meals,
 	})
@@ -295,7 +281,7 @@ func uploadWeeklyMeal(context *gin.Context) {
 	var mealUpload MealUpload
 	err := context.BindJSON(&mealUpload)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, ApiResult{
+		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
 		})
@@ -305,7 +291,7 @@ func uploadWeeklyMeal(context *gin.Context) {
 	csvString := mealUpload.Csv
 	records, err := parseCSV(csvString)
 	if err != nil {
-		context.JSON(http.StatusBadRequest, ApiResult{
+		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
 		})
@@ -315,7 +301,7 @@ func uploadWeeklyMeal(context *gin.Context) {
 	// Print parsed records
 	for _, record := range records {
 		if len(record) != 2 {
-			context.JSON(http.StatusBadRequest, ApiResult{
+			context.JSON(http.StatusBadRequest, models.ApiResult{
 				StatusCode: http.StatusBadRequest,
 				Error:      "CSV must have 2 columns",
 			})
@@ -325,31 +311,25 @@ func uploadWeeklyMeal(context *gin.Context) {
 
 	for _, record := range records {
 		date, description := record[0], record[1]
-		_, err := db.Exec("INSERT INTO meal (description, date) VALUES (?, ?)", description, date)
+		err := mealRepository.CreateMeal(&models.Meal{Date: date, Description: description})
 		if err != nil {
-			context.JSON(http.StatusInternalServerError, ApiResult{
+			context.JSON(http.StatusInternalServerError, models.ApiResult{
 				StatusCode: http.StatusInternalServerError,
 				Error:      err.Error(),
 			})
 		}
 	}
 
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 	})
 }
 
 func parseCSV(input string) ([][]string, error) {
-	// Create a new CSV reader
 	r := csv.NewReader(strings.NewReader(input))
 
-	// Set the field delimiter to comma
-	r.Comma = ','
+	r.FieldsPerRecord = 2
 
-	// Allow variable number of fields per record
-	r.FieldsPerRecord = -1
-
-	// Parse all records
 	records, err := r.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing CSV: %v", err)
@@ -363,82 +343,25 @@ func getMeals(context *gin.Context) {
 	endDate := context.Query("endDate")
 
 	if startDate == "" || endDate == "" {
-		context.JSON(http.StatusBadRequest, ApiResult{
+		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      "startDate and endDate are required query parameters",
 		})
 		return
 	}
 
-	var meals []Meal
-	rows, err := db.Query("SELECT id, description, date FROM meal WHERE date >= ? AND date <= ? ORDER BY description", startDate, endDate)
+	meals, err := mealRepository.GetMealsByDates(startDate, endDate)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, ApiResult{
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
-	}
+		return
+	 }
 
-	defer rows.Close()
-
-	for rows.Next() {
-		var meal Meal
-		err := rows.Scan(&meal.Id, &meal.Description, &meal.Date)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      err.Error(),
-			})
-		}
-
-		date, err := time.Parse(time.RFC3339, meal.Date)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      err.Error(),
-			})
-		}
-		meal.Date = date.Format(DATE_FORMAT)
-		meals = append(meals, meal)
-	}
-
-	context.JSON(http.StatusOK, ApiResult{
+	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 		Data:       meals,
 	})
 
-}
-
-type Meal struct {
-	Id          int    `json:"id"`
-	Description string `json:"description"`
-	Date        string `json:"date"`
-}
-
-type Donation struct {
-	Id          int    `json:"id"`
-	Description string `json:"description"`
-	Name        string `json:"name"`
-	Date        string `json:"date"`
-	Doe         string `json:"doe"`
-}
-
-type DonationClaim struct {
-	Id         int    `json:"id"`
-	DonationId int    `json:"donationId"`
-	Name       string `json:"name"`
-	Doe        string `json:"doe"`
-}
-
-type ApiResult struct {
-	StatusCode int         `json:"statusCode"`
-	Error      string      `json:"error"`
-	Data       interface{} `json:"data"`
-}
-
-type DonationClaimSummary struct {
-	Claimed     bool   `json:"claimed"`
-	Description string `json:"description"`
-	DonatorName string `json:"donatorName"`
-	ClaimerName string `json:"claimerName"`
 }
