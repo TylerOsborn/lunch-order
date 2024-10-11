@@ -1,10 +1,8 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"log"
 	"lunchorder/constants"
 	"lunchorder/models"
 	"lunchorder/repository"
@@ -15,28 +13,27 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-var db *sql.DB
+var db *gorm.DB
 
 var donationRepository *repository.DonationRepository
 var mealRepository *repository.MealRepository
-var donationClaimRepository *repository.DonationClaimRepository
+var userRepository *repository.UserRepository
 
 func main() {
-	// DB setup
-	fmt.Println("Setting up db...")
 	var err error
-	db, err = sql.Open("sqlite3", "./database/database.db")
+	db, err = gorm.Open(sqlite.Open("./database/database.db"), &gorm.Config{})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	initDB()
-	defer db.Close()
+	initDB(db)
 
-	donationRepository = repository.NewDonationRepository(db)
 	mealRepository = repository.NewMealRepository(db)
-	donationClaimRepository = repository.NewDonationClaimRepository(db)
+	userRepository = repository.NewUserRepository(db)
+	donationRepository = repository.NewDonationRepository(db, userRepository)
 
 	// Route setup
 	r := gin.Default()
@@ -61,38 +58,20 @@ func setupCors(r *gin.Engine) {
 	}))
 }
 
-func initDB() {
-
-	sqlStmt := `
-CREATE TABLE IF NOT EXISTS  meal 
-(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    description TEXT NOT NULL,
-    date DATE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS donation
-(
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        VARCHAR(255),
-    description TEXT,
-    claimed     BOOLEAN DEFAULT FALSE,
-    date        DATE    DEFAULT CURRENT_DATE,
-    doe         DATETIME   DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS donation_claim
-(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    donation_id INT,
-    name VARCHAR(255),
-    doe DATETIME DEFAULT CURRENT_TIMESTAMP
-)
-	`
-	_, err := db.Exec(sqlStmt)
+func initDB(db *gorm.DB) {
+	err := db.Migrator().AutoMigrate(&models.Meal{})
 	if err != nil {
-		log.Printf("%q: %s\n", err, sqlStmt)
-		return
+		panic(err)
+	}
+
+	err = db.Migrator().AutoMigrate(&models.User{})
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.Migrator().AutoMigrate(&models.Donation{})
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -131,33 +110,14 @@ func getClaimsSummaryToday(context *gin.Context) {
 	}
 
 	var donationClaimSummaries []models.DonationClaimSummary
+	tx := db.Raw("SELECT donations.recipient_id > 0 AS claimed, meals.description AS description, donors.name AS donor_name, COALESCE(recipients.name, 'UNCLAIMED') AS recipient_name FROM donations INNER JOIN users donors ON donors.id = donations.donor_id LEFT JOIN users recipients ON recipients.id = donations.recipient_id INNER JOIN meals ON donations.meal_id = meals.id WHERE meals.date = ?", date).Scan(&donationClaimSummaries)
 
-	rows, err := db.Query("SELECT donation.claimed AS claimed, donation.description AS decription, donation.name AS donator_name, COALESCE(donation_claim.name, 'UNCLAIMED') AS claimer_name FROM donation LEFT JOIN donation_claim ON donation.id = donation_claim.donation_id WHERE donation.date = ?", date)
-
-	if err != nil {
+	if tx.Error != nil {
 		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
+			Error:      tx.Error.Error(),
 		})
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-		var donationClaimSummary models.DonationClaimSummary
-		err := rows.Scan(&donationClaimSummary.Claimed, &donationClaimSummary.Description, &donationClaimSummary.DonatorName, &donationClaimSummary.ClaimerName)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, models.ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      err.Error(),
-			})
-		}
-
-		if donationClaimSummary.ClaimerName != "UNCLAIMED" {
-			donationClaimSummary.Claimed = true
-		}
-
-		donationClaimSummaries = append(donationClaimSummaries, donationClaimSummary)
+		return
 	}
 
 	context.JSON(http.StatusOK, models.ApiResult{
@@ -168,7 +128,7 @@ func getClaimsSummaryToday(context *gin.Context) {
 }
 
 func claimDonation(context *gin.Context) {
-	var donationClaim models.DonationClaim
+	var donationClaim models.APIRecipient
 	err := context.BindJSON(&donationClaim)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
@@ -178,7 +138,22 @@ func claimDonation(context *gin.Context) {
 		return
 	}
 
-	success, err := donationRepository.ClaimDonation(donationClaim.DonationId)
+	user, err := userRepository.GetUserByName(donationClaim.Name)
+
+	if err != nil && err != gorm.ErrRecordNotFound {
+		context.JSON(http.StatusBadRequest, models.ApiResult{
+			StatusCode: http.StatusBadRequest,
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if err == gorm.ErrRecordNotFound {
+		user = &models.User{Name: donationClaim.Name}
+		userRepository.CreateUser(user)
+	}
+
+	success, err := donationRepository.ClaimDonation(donationClaim.DonationID, user)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -195,22 +170,13 @@ func claimDonation(context *gin.Context) {
 		return
 	}
 
-	err = donationClaimRepository.CreateDonationClaim(&donationClaim)
-
-	if err != nil {
-		context.JSON(http.StatusOK, models.ApiResult{
-			StatusCode: http.StatusOK,
-			Error:      "Meal was allocated but the following error was produced: " + err.Error(),
-		})
-	}
-
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 	})
 }
 
 func getDonations(context *gin.Context) {
-	var donations []models.Donation
+	var donations []models.UnclaimedDonation
 
 	today := time.Now().Format(constants.DATE_FORMAT)
 	
@@ -231,8 +197,8 @@ func getDonations(context *gin.Context) {
 }
 
 func donateMeal(context *gin.Context) {
-	var donation models.Donation
-	err := context.BindJSON(&donation)
+	var donationRequest models.APIDonation
+	err := context.BindJSON(&donationRequest)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
@@ -241,10 +207,10 @@ func donateMeal(context *gin.Context) {
 		return
 	}
 
-	err = donationRepository.CreateDonation(&donation)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
+	err = donationRepository.CreateDonation(&donationRequest)
+		if err != nil {
+		context.JSON(http.StatusBadRequest, models.ApiResult{
+			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
 		})
 		return
@@ -265,6 +231,7 @@ func getTodayMeal(context *gin.Context) {
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
+		return
 	}
 
 	context.JSON(http.StatusOK, models.ApiResult{
@@ -317,6 +284,7 @@ func uploadWeeklyMeal(context *gin.Context) {
 				StatusCode: http.StatusInternalServerError,
 				Error:      err.Error(),
 			})
+			return
 		}
 	}
 

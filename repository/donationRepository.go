@@ -1,93 +1,87 @@
 package repository
 
 import (
-	"database/sql"
 	"log"
-	. "lunchorder/models"
+	"lunchorder/models"
+
+	"gorm.io/gorm"
 )
 
 type DonationRepository struct {
-	db *sql.DB
+	db *gorm.DB
+	userRepository *UserRepository
 }
 
 var donationRepository *DonationRepository
 
-func NewDonationRepository(db *sql.DB) *DonationRepository {
+func NewDonationRepository(db *gorm.DB, userRepository *UserRepository) *DonationRepository {
 	if donationRepository == nil {
 		donationRepository = &DonationRepository{
 			db: db,
+			userRepository: userRepository,
 		}	
 	}
 
 	return donationRepository
 }
 
-func (r *DonationRepository) CreateDonation(donation *Donation) error {
-	_, err := r.db.Exec("INSERT INTO donation (name, description) VALUES (?, ?)", donation.Name, donation.Description)
+func (r *DonationRepository) CreateDonation(donationRequest *models.APIDonation) error {
+	var donation models.Donation
+
+	donor, err := r.userRepository.GetUserByName(donationRequest.DonorName)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return err
+	}
+	
+	if err == gorm.ErrRecordNotFound {
+		donor = &models.User{Name: donationRequest.DonorName}
+		err = r.userRepository.CreateUser(donor)
+	}
+
 	if err != nil {
-		log.Println("Failed to create donation:", err)
 		return err
 	}
 
-	return nil
+	donation.DonorID = donor.ID
+	donation.MealID = donationRequest.MealID
+	
+	result := r.db.Create(&donation)
+
+	return result.Error
 }
 
-func (r *DonationRepository) ClaimDonation(donationId int) (bool, error) {
-	result, err := r.db.Exec("UPDATE donation SET claimed = 1 WHERE id = ? AND claimed = 0", donationId)
-	if err != nil {
-		log.Println("Failed to claim donation:", err)
-		return false, err
+func (r *DonationRepository) ClaimDonation(donationId uint, user *models.User) (bool, error) {
+
+	result := r.db.Exec("UPDATE donations SET recipient_id = ? WHERE id = ? AND (recipient_id = 0 OR recipient_id IS NULL)", user.ID, donationId)
+	if result.Error != nil {
+		log.Println("Failed to claim donation:", result.Error)
+		return false, result.Error
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-
-	return rowsAffected > 0, nil
+	return result.RowsAffected > 0, nil
 }
 
-func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donation, error) {
-	rows, err := r.db.Query("SELECT DISTINCT description, name, id FROM donation WHERE claimed = 0 AND date = ? GROUP BY description ORDER BY description", date)
-	if err != nil {
-		log.Println("Failed to get unclaimed donations:", err)
-		return nil, err
-	}
-	defer rows.Close()
+func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]models.UnclaimedDonation, error) {
+	var unclaimedDonations []models.UnclaimedDonation
 
-	var donations []Donation
+	result := r.db.Raw("SELECT DISTINCT meals.description, users.name AS donor_name, donations.id FROM donations INNER JOIN meals ON donations.meal_id = meals.id INNER JOIN users ON donations.donor_id = users.id WHERE (recipient_id <= 0  OR recipient_id IS NULL) AND meals.date = ? GROUP BY description ORDER BY description", date).Scan(&unclaimedDonations)
 
-	for rows.Next() {
-		var donation Donation
-		err := rows.Scan(&donation.Description, &donation.Name, &donation.Id)
-		if err != nil {
-			return nil, err
-		}
-		donations = append(donations, donation)
+	if result.Error != nil {	
+		return nil, result.Error
 	}
 
-
-	return donations, nil
+	return unclaimedDonations, nil
 }
 
-func (r *DonationRepository) GetUnclaimedDonations() ([]Donation, error) {
-	rows, err := r.db.Query("SELECT DISTINCT description, name, id FROM donation WHERE claimed = 0 GROUP BY description ORDER BY description")
-	if err != nil {
-		log.Println("Failed to get unclaimed donations:", err)
-		return nil, err
-	}
-	defer rows.Close()
+func (r *DonationRepository) GetUnclaimedDonations() ([]models.UnclaimedDonation, error) {
 
-	var donations []Donation
+	var unclaimedDonations []models.UnclaimedDonation
 
-	for rows.Next() {
-		var donation Donation
-		err := rows.Scan(&donation.Description, &donation.Name, &donation.Id)
-		if err != nil {
-			return nil, err
-		}
-		donations = append(donations, donation)
+	result := r.db.Raw("SELECT DISTINCT description, name, id FROM donations INNER JOIN meals ON donations.meal_id = meal.id WHERE recipient_id <= 0  OR recipient IS NULL GROUP BY description ORDER BY description").Scan(&unclaimedDonations)
+	
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
-	return donations, nil
+	return unclaimedDonations, nil
 }

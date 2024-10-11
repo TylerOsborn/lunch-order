@@ -1,81 +1,85 @@
 <script lang="ts">
-  import api from '../axios/axios.ts';
-  import { ApiResult, DonationClaimSummary, Meal } from '../models/models.ts';
-  import { getTodayDate, mondayDate, thursdayDate } from '../utils/utils.ts';
+import api from "../axios/axios.ts";
+import { ApiResult, DonationClaimSummary, Meal } from "../models/models.ts";
+import { getTodayDate, mondayDate, thursdayDate } from "../utils/utils.ts";
 
-  import Card from 'primevue/card';
-  import Listbox from 'primevue/listbox';
-  import FileUpload from 'primevue/fileupload';
-  import Divider from 'primevue/divider';
-  import DataTable from 'primevue/datatable';
-  import Column from 'primevue/column';
-  import Textarea from 'primevue/textarea';
-  import Button from 'primevue/button';
+import Card from "primevue/card";
+import Listbox from "primevue/listbox";
+import FileUpload from "primevue/fileupload";
+import Divider from "primevue/divider";
+import DataTable from "primevue/datatable";
+import Column from "primevue/column";
+import Textarea from "primevue/textarea";
+import Button from "primevue/button";
 
-  export default {
-    name: 'AdminScreen',
-    components: {
-      Card,
-      Listbox,
-      FileUpload,
-      Divider,
-      DataTable,
-      Column,
-      Textarea,
-      Button,
+export default {
+  name: "AdminScreen",
+  components: {
+    Card,
+    Listbox,
+    FileUpload,
+    Divider,
+    DataTable,
+    Column,
+    Textarea,
+    Button,
+  },
+  data() {
+    return {
+      meals: [] as Meal[],
+      newMeals: "" as string,
+      claimsSummary: [] as DonationClaimSummary[],
+    };
+  },
+  mounted() {
+    this.getMeals();
+    this.getClaimsSummary();
+  },
+  methods: {
+    submitMeal() {
+      api
+        .post("/Api/Meal/Upload", { csv: this.newMeals })
+        .then((response) => {
+          console.log("Meal uploaded:", response.data);
+        })
+        .then(() => {
+          this.getMeals();
+          this.newMeals = "";
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     },
-    data() {
-      return {
-        meals: [] as Meal[],
-        newMeals: '' as string,
-        claimsSummary: [] as DonationClaimSummary[],
-      };
+    getMeals() {
+      api
+        .get(`/Api/Meal?startDate=${this.monday}&endDate=${this.thursday}`)
+        .then((response) => {
+          let result: ApiResult<Meal[]> = response.data;
+          this.meals = result.data;
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     },
-    mounted() {
-      this.getMeals();
-      this.getClaimsSummary();
+    getClaimsSummary() {
+      api
+        .get(`/Api/Stats/Claims/Summary?date=${this.today}&timestamp=${new Date().getTime()}`)
+        .then((response) => {
+          let result: ApiResult<DonationClaimSummary[]> = response.data;
+          if (result.error) {
+            this.$toast.add({ severity: "error", summary: "Error", detail: result.error });
+            return;
+          }
+          this.claimsSummary = result.data;
+        })
+        .catch((error) => {
+          this.$toast.add({ severity: "error", summary: "Error", detail: `Error: ${error}` });
+        });
     },
-    methods: {
-      submitMeal() {
-        api
-          .post('/Api/Meal/Upload', { csv: this.newMeals })
-          .then((response) => {
-            console.log('Meal uploaded:', response.data);
-          })
-          .then(() => {
-            this.getMeals();
-            this.newMeals = '';
-          })
-          .catch((error) => {
-            console.log(error);
-          });
-      },
-      getMeals() {
-        api
-          .get(`/Api/Meal?startDate=${this.monday}&endDate=${this.thursday}`)
-          .then((response) => {
-            let result: ApiResult<Meal[]> = response.data;
-            this.meals = result.data;
-          })
-          .catch((error) => {
-            console.log(error);
-          });
-      },
-      getClaimsSummary() {
-        api
-          .get(`/Api/Stats/Claims/Summary?date=${this.today}&timestamp=${new Date().getTime()}`)
-          .then((response) => {
-            let result: ApiResult<DonationClaimSummary[]> = response.data;
-            if (result.error) {
-              this.$toast.add({ severity: 'error', summary: 'Error', detail: result.error });
-              return;
-            }
-            this.claimsSummary = result.data;
-          })
-          .catch((error) => {
-            this.$toast.add({ severity: 'error', summary: 'Error', detail: `Error: ${error}` });
-          });
-      },
+  },
+  computed: {
+    monday() {
+      return mondayDate();
     },
     computed: {
       monday() {
@@ -88,7 +92,11 @@
         return getTodayDate();
       },
     },
-  };
+    today() {
+      return getTodayDate();
+    },
+  },
+};
 </script>
 
 <template>
@@ -102,8 +110,8 @@
           <DataTable scrollable scrollHeight="400px" :value="claimsSummary">
             <Column field="claimed" header="Claimed" />
             <Column field="description" header="Description" />
-            <Column field="donatorName" header="Donator" />
-            <Column field="claimerName" header="Claimer" />
+            <Column field="donorName" header="Donor" />
+            <Column field="recipientName" header="Recipient" />
           </DataTable>
         </div>
       </template>

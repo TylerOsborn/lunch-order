@@ -12,14 +12,13 @@ export interface Meal {
 
 export interface Donation {
   id: number;
-  name: string;
+  donorName: string;
   description: string;
-  date: string;
 }
 
 export interface DonationClaimSummary {
   claimed: boolean;
   description: string;
-  donatorName: string;
-  claimerName: string;
+  donorName: string;
+  recipientName: string;
 }
