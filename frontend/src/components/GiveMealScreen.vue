@@ -4,28 +4,28 @@
     <form class="flex" @submit.prevent="submitMeal">
       <div class="flex-left full-width">
         <InputText
-          class="full-width"
-          :invalid="userNameInputErrorText !== ''"
-          placeholder="Name"
-          id="name"
-          v-model="name"
+            class="full-width"
+            :invalid="userNameInputErrorText !== ''"
+            placeholder="Name"
+            id="name"
+            v-model="name"
         />
         <small v-if="userNameInputErrorText !== ''" id="name-help" class="error-text">{{
-          userNameInputErrorText
-        }}</small>
+            userNameInputErrorText
+          }}</small>
       </div>
       <div class="flex-left full-width">
         <Listbox
-          class="full-width"
-          :invalid="mealInputErrorText != ''"
-          size
-          v-model="selectedMealType"
-          :options="meals"
-          optionValue="id"
-          optionLabel="description"
-          placeholder="Select..."
-          id="meal"
-          required
+            class="full-width"
+            :invalid="mealInputErrorText != ''"
+            size
+            v-model="selectedMealType"
+            :options="meals"
+            optionValue="id"
+            optionLabel="description"
+            placeholder="Select..."
+            id="meal"
+            required
         />
         <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
       </div>
@@ -40,9 +40,9 @@ import Listbox from "primevue/listbox";
 import FloatLabel from "primevue/floatlabel";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import { ApiResult, Meal } from "../models/models.ts";
+import {ApiResult, Meal} from "../models/models.ts";
 import api from "../axios/axios.ts";
-import { getNameFromCookie, setNameCookie } from "../utils/utils.ts";
+import {getNameFromCookie, setNameCookie} from "../utils/utils.ts";
 
 export default {
   name: "GiveMealScreen",
@@ -69,14 +69,14 @@ export default {
   methods: {
     getMeals() {
       api
-        .get(`/Api/Meal/Today`)
-        .then((response) => {
-          let result: ApiResult<Meal[]> = response.data;
-          this.meals = result.data;
-        })
-        .catch((_) => {
-          this.$toast.add({ severity: "error", summary: "Error", detail: "Error loading meal options", life: 3000 });
-        });
+          .get(`/Api/Meal/Today`)
+          .then((response) => {
+            let result: ApiResult<Meal[]> = response.data;
+            this.meals = result.data;
+          })
+          .catch((_) => {
+            this.$toast.add({severity: "error", summary: "Error", detail: "Error loading meal options", life: 3000});
+          });
     },
     validateDonationForm(name: string, selectedMealType: number): boolean {
       let valid = true;
@@ -106,18 +106,18 @@ export default {
         return;
       }
       api
-        .post("/Api/Donation", { donorName: this.name, mealId: this.selectedMealType })
-        .then((response) => {
-          if (response.status === 200) {
-            this.$toast.add({ severity: "success", summary: "Success", detail: "Thank you for donating!", life: 3000 });
-            this.$router.push("/");
-          } else {
-            this.$toast.add({ severity: "error", summary: "Error", detail: "Unable to donate meal", life: 3000 });
-          }
-        })
-        .catch((_) => {
-          this.$toast.add({ severity: "error", summary: "Error", detail: "Unable to donate meal", life: 3000 });
-        });
+          .post("/Api/Donation", {donorName: this.name, mealId: this.selectedMealType})
+          .then((response) => {
+            if (response.status === 200) {
+              this.$toast.add({severity: "success", summary: "Success", detail: "Thank you for donating!", life: 3000});
+              this.$router.push("/");
+            } else {
+              this.$toast.add({severity: "error", summary: "Error", detail: "Unable to donate meal", life: 3000});
+            }
+          })
+          .catch((_) => {
+            this.$toast.add({severity: "error", summary: "Error", detail: "Unable to donate meal", life: 3000});
+          });
       setNameCookie(this.name);
     },
   },

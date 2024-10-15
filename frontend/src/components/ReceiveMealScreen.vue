@@ -4,31 +4,31 @@
     <div v-if="availableMeals === null || availableMeals.length === 0">
       <p>There are no meals available at the moment.</p>
     </div>
-    <div class="flex" v-else>
+    <div v-else class="flex">
       <div class="flex-left full-width">
         <InputText
-          class="full-width"
-          :invalid="userNameInputErrorText !== ''"
-          placeholder="Name"
-          id="name"
-          v-model="name"
+            id="name"
+            v-model="name"
+            :invalid="userNameInputErrorText !== ''"
+            class="full-width"
+            placeholder="Name"
         />
         <small v-if="userNameInputErrorText !== ''" class="error-text">{{ userNameInputErrorText }}</small>
       </div>
       <div class="flex-left full-width">
         <Listbox
-          v-model="selectedDonation"
-          :invalid="mealInputErrorText !== ''"
-          :options="availableMeals"
-          optionLabel="description"
+            v-model="selectedDonation"
+            :invalid="mealInputErrorText !== ''"
+            :options="availableMeals"
+            optionLabel="description"
         />
         <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
       </div>
-      <Button @click="selectMeal(selectedDonation)" class="full-width"> Select Option </Button>
+      <Button class="full-width" @click="selectMeal(selectedDonation)"> Select Option</Button>
     </div>
-    <Dialog :visible="dialogVisible" modal header="Meal Claimed!">
+    <Dialog :visible="dialogVisible" header="Meal Claimed!" modal>
       <p>You have claimed "{{ selectedDonation.description }}" from {{ selectedDonation.donorName }}</p>
-      <Button @click="handleOkayButton" label="Okay" />
+      <Button label="Okay" @click="handleOkayButton"/>
     </Dialog>
   </div>
 </template>
@@ -39,8 +39,8 @@ import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import api from "../axios/axios.ts";
-import { ApiResult, Donation } from "../models/models.ts";
-import { getNameFromCookie, setNameCookie } from "../utils/utils.ts";
+import {ApiResult, Donation} from "../models/models.ts";
+import {getNameFromCookie, setNameCookie} from "../utils/utils.ts";
 
 export default {
   name: "ReceiveMealScreen",
@@ -71,14 +71,14 @@ export default {
   methods: {
     getAvailableMeals() {
       api
-        .get(`/Api/Donation?timestamp=${new Date().getTime()}`)
-        .then((response) => {
-          let result: ApiResult<Donation[]> = response.data;
-          this.availableMeals = result.data;
-        })
-        .catch((_) => {
-          this.$toast.add({ severity: "error", summary: "Error", detail: "Error loading meal options", life: 3000 });
-        });
+          .get(`/Api/Donation?timestamp=${new Date().getTime()}`)
+          .then((response) => {
+            let result: ApiResult<Donation[]> = response.data;
+            this.availableMeals = result.data;
+          })
+          .catch((_) => {
+            this.$toast.add({severity: "error", summary: "Error", detail: "Error loading meal options", life: 3000});
+          });
     },
     handleOkayButton() {
       this.$router.push("/");
@@ -115,22 +115,22 @@ export default {
         }
 
       api
-        .post("/Api/Donation/Claim", {
-          donationId: donation.id,
-          name: this.name,
-        })
-        .then((response) => {
-          if (response.status === 200) {
-            this.dialogVisible = true;
-            return;
-          }
-          this.$toast.add({ severity: "error", summary: "Error", detail: "Unable to claim meal", life: 3000 });
-          this.getAvailableMeals();
-        })
-        .catch((_) => {
-          this.$toast.add({ severity: "error", summary: "Error", detail: "Unable to claim meal", life: 3000 });
-          this.getAvailableMeals();
-        });
+          .post("/Api/Donation/Claim", {
+            donationId: donation.id,
+            name: this.name,
+          })
+          .then((response) => {
+            if (response.status === 200) {
+              this.dialogVisible = true;
+              return;
+            }
+            this.$toast.add({severity: "error", summary: "Error", detail: "Unable to claim meal", life: 3000});
+            this.getAvailableMeals();
+          })
+          .catch((_) => {
+            this.$toast.add({severity: "error", summary: "Error", detail: "Unable to claim meal", life: 3000});
+            this.getAvailableMeals();
+          });
       setNameCookie(this.name);
     },
   },

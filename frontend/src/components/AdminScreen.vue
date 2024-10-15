@@ -1,7 +1,7 @@
 <script lang="ts">
 import api from "../axios/axios.ts";
-import { ApiResult, DonationClaimSummary, Meal } from "../models/models.ts";
-import { getTodayDate, mondayDate, thursdayDate } from "../utils/utils.ts";
+import {ApiResult, DonationClaimSummary, Meal} from "../models/models.ts";
+import {getTodayDate, mondayDate, thursdayDate} from "../utils/utils.ts";
 
 import Card from "primevue/card";
 import Listbox from "primevue/listbox";
@@ -38,43 +38,43 @@ export default {
   methods: {
     submitMeal() {
       api
-        .post("/Api/Meal/Upload", { csv: this.newMeals })
-        .then((response) => {
-          console.log("Meal uploaded:", response.data);
-        })
-        .then(() => {
-          this.getMeals();
-          this.newMeals = "";
-        })
-        .catch((error) => {
-          console.log(error);
-        });
+          .post("/Api/Meal/Upload", {csv: this.newMeals})
+          .then((response) => {
+            console.log("Meal uploaded:", response.data);
+          })
+          .then(() => {
+            this.getMeals();
+            this.newMeals = "";
+          })
+          .catch((error) => {
+            console.log(error);
+          });
     },
     getMeals() {
       api
-        .get(`/Api/Meal?startDate=${this.monday}&endDate=${this.thursday}`)
-        .then((response) => {
-          let result: ApiResult<Meal[]> = response.data;
-          this.meals = result.data;
-        })
-        .catch((error) => {
-          console.log(error);
-        });
+          .get(`/Api/Meal?startDate=${this.monday}&endDate=${this.thursday}`)
+          .then((response) => {
+            let result: ApiResult<Meal[]> = response.data;
+            this.meals = result.data;
+          })
+          .catch((error) => {
+            console.log(error);
+          });
     },
     getClaimsSummary() {
       api
-        .get(`/Api/Stats/Claims/Summary?date=${this.today}&timestamp=${new Date().getTime()}`)
-        .then((response) => {
-          let result: ApiResult<DonationClaimSummary[]> = response.data;
-          if (result.error) {
-            this.$toast.add({ severity: "error", summary: "Error", detail: result.error });
-            return;
-          }
-          this.claimsSummary = result.data;
-        })
-        .catch((error) => {
-          this.$toast.add({ severity: "error", summary: "Error", detail: `Error: ${error}` });
-        });
+          .get(`/Api/Stats/Claims/Summary?date=${this.today}&timestamp=${new Date().getTime()}`)
+          .then((response) => {
+            let result: ApiResult<DonationClaimSummary[]> = response.data;
+            if (result.error) {
+              this.$toast.add({severity: "error", summary: "Error", detail: result.error});
+              return;
+            }
+            this.claimsSummary = result.data;
+          })
+          .catch((error) => {
+            this.$toast.add({severity: "error", summary: "Error", detail: `Error: ${error}`});
+          });
     },
   },
   computed: {
@@ -108,10 +108,10 @@ export default {
       <template #content>
         <div style="height: inherit">
           <DataTable scrollable scrollHeight="400px" :value="claimsSummary">
-            <Column field="claimed" header="Claimed" />
-            <Column field="description" header="Description" />
-            <Column field="donorName" header="Donor" />
-            <Column field="recipientName" header="Recipient" />
+            <Column field="claimed" header="Claimed"/>
+            <Column field="description" header="Description"/>
+            <Column field="donorName" header="Donor"/>
+            <Column field="recipientName" header="Recipient"/>
           </DataTable>
         </div>
       </template>
@@ -122,13 +122,13 @@ export default {
       </template>
       <template #content>
         <DataTable :value="meals" scrollable scrollHeight="400px">
-          <Column field="date" header="Date" />
-          <Column field="description" header="Description" />
+          <Column field="date" header="Date"/>
+          <Column field="description" header="Description"/>
         </DataTable>
-        <Divider />
+        <Divider/>
         <h3>Upload Weekly Meals</h3>
         <form>
-          <Textarea rows="10" cols="72" v-model="newMeals" placeholder="Enter weekly meals here" />
+          <Textarea rows="10" cols="72" v-model="newMeals" placeholder="Enter weekly meals here"/>
           <Button type="submit" class="sub-button" @click.prevent="submitMeal">Submit</Button>
         </form>
       </template>

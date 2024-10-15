@@ -1,13 +1,14 @@
 <template>
-  <Toast />
+  <Toast/>
   <router-view></router-view>
 </template>
 
 <script>
-  import Toast from 'primevue/toast';
-  export default {
-    components: {
-      Toast,
-    },
-  };
+import Toast from 'primevue/toast';
+
+export default {
+  components: {
+    Toast
+  }
+}
 </script>
