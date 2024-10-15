@@ -1,11 +1,12 @@
 package main
 
 import (
-	"encoding/csv"
-	"fmt"
+	"errors"
 	"lunchorder/constants"
 	"lunchorder/models"
 	"lunchorder/repository"
+	"lunchorder/service"
+	"lunchorder/utils"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +24,9 @@ var donationRepository *repository.DonationRepository
 var mealRepository *repository.MealRepository
 var userRepository *repository.UserRepository
 
+var donationService *service.DonationService
+var mealService *service.MealService
+
 func main() {
 	var err error
 	db, err = gorm.Open(sqlite.Open("./database/database.db"), &gorm.Config{})
@@ -34,6 +38,9 @@ func main() {
 	mealRepository = repository.NewMealRepository(db)
 	userRepository = repository.NewUserRepository(db)
 	donationRepository = repository.NewDonationRepository(db, userRepository)
+
+	donationService = service.NewDonationService(donationRepository, mealRepository, userRepository)
+	mealService = service.NewMealService(mealRepository)
 
 	// Route setup
 	r := gin.Default()
@@ -89,33 +96,32 @@ func setupFrontEnd(r *gin.Engine) {
 }
 
 func setupRoutes(r *gin.Engine) {
-	r.GET("/Api/Meal", getMeals)
+	r.GET("/Api/Meal", HandleGetMeals)
 
-	r.POST("/Api/Meal/Upload", uploadWeeklyMeal)
-	r.GET("/Api/Meal/Today", getTodayMeal)
+	r.POST("/Api/Meal/Upload", HandleMealUpload)
+	r.GET("/Api/Meal/Today", HandleGetMealsToday)
 
-	r.POST("/Api/Donation", donateMeal)
-	r.GET("/Api/Donation", getDonations)
+	r.POST("/Api/Donation", HandleDonateMeal)
+	r.GET("/Api/Donation", HandleGetUnclaimedDonations)
 
-	r.POST("/Api/Donation/Claim", claimDonation)
+	r.POST("/Api/Donation/Claim", HandleDonationClaim)
 
-	r.GET("/Api/Stats/Claims/Summary", getClaimsSummaryToday)
+	r.GET("/Api/Stats/Claims/Summary", HandleGetDonationSummary)
 }
 
-func getClaimsSummaryToday(context *gin.Context) {
+func HandleGetDonationSummary(context *gin.Context) {
 	date := context.Query("date")
 
 	if date == "" {
 		date = time.Now().Format(constants.DATE_FORMAT)
 	}
 
-	var donationClaimSummaries []models.DonationClaimSummary
-	tx := db.Raw("SELECT donations.recipient_id > 0 AS claimed, meals.description AS description, donors.name AS donor_name, COALESCE(recipients.name, 'UNCLAIMED') AS recipient_name FROM donations INNER JOIN users donors ON donors.id = donations.donor_id LEFT JOIN users recipients ON recipients.id = donations.recipient_id INNER JOIN meals ON donations.meal_id = meals.id WHERE meals.date = ?", date).Scan(&donationClaimSummaries)
+	donationClaimSummaries, err := donationService.GetDonationsSummaryByDate(date)
 
-	if tx.Error != nil {
+	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      tx.Error.Error(),
+			Error:      err.Error(),
 		})
 		return
 	}
@@ -124,10 +130,9 @@ func getClaimsSummaryToday(context *gin.Context) {
 		StatusCode: http.StatusOK,
 		Data:       donationClaimSummaries,
 	})
-
 }
 
-func claimDonation(context *gin.Context) {
+func HandleDonationClaim(context *gin.Context) {
 	var donationClaim models.APIRecipient
 	err := context.BindJSON(&donationClaim)
 	if err != nil {
@@ -138,34 +143,12 @@ func claimDonation(context *gin.Context) {
 		return
 	}
 
-	user, err := userRepository.GetUserByName(donationClaim.Name)
+	err = donationService.ClaimDonation(&donationClaim)
 
-	if err != nil && err != gorm.ErrRecordNotFound {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	if err == gorm.ErrRecordNotFound {
-		user = &models.User{Name: donationClaim.Name}
-		userRepository.CreateUser(user)
-	}
-
-	success, err := donationRepository.ClaimDonation(donationClaim.DonationID, user)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	if !success {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      "Donation not found",
+			Error:      err.Error(),
 		})
 		return
 	}
@@ -175,12 +158,13 @@ func claimDonation(context *gin.Context) {
 	})
 }
 
-func getDonations(context *gin.Context) {
+func HandleGetUnclaimedDonations(context *gin.Context) {
 	var donations []models.UnclaimedDonation
 
 	today := time.Now().Format(constants.DATE_FORMAT)
-	
-	donations, err := donationRepository.GetUnclaimedDonationsByDate(today)
+
+	donations, err := donationService.GetUnclaimedDonationsByDate(today)
+
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -196,7 +180,7 @@ func getDonations(context *gin.Context) {
 
 }
 
-func donateMeal(context *gin.Context) {
+func HandleDonateMeal(context *gin.Context) {
 	var donationRequest models.APIDonation
 	err := context.BindJSON(&donationRequest)
 	if err != nil {
@@ -207,8 +191,9 @@ func donateMeal(context *gin.Context) {
 		return
 	}
 
-	err = donationRepository.CreateDonation(&donationRequest)
-		if err != nil {
+	err = donationService.CreateDonation(&donationRequest)
+
+	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
@@ -221,11 +206,12 @@ func donateMeal(context *gin.Context) {
 	})
 }
 
-func getTodayMeal(context *gin.Context) {
+func HandleGetMealsToday(context *gin.Context) {
 	var meals []models.Meal
 	today := time.Now().Format(constants.DATE_FORMAT)
 
-	meals, err := mealRepository.GetMealsByDate(today)
+	meals, err := mealService.GetMealsByDate(today)
+
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
@@ -240,12 +226,8 @@ func getTodayMeal(context *gin.Context) {
 	})
 }
 
-type MealUpload struct {
-	Csv string `json:"csv"`
-}
-
-func uploadWeeklyMeal(context *gin.Context) {
-	var mealUpload MealUpload
+func HandleMealUpload(context *gin.Context) {
+	var mealUpload models.MealUpload
 	err := context.BindJSON(&mealUpload)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
@@ -255,9 +237,9 @@ func uploadWeeklyMeal(context *gin.Context) {
 		return
 	}
 
-	csvString := mealUpload.Csv
-	records, err := parseCSV(csvString)
-	if err != nil {
+	err = mealService.CreateMeals(mealUpload)
+
+	if errors.Is(err, utils.ErrIncorrectCSVFormat) {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
 			StatusCode: http.StatusBadRequest,
 			Error:      err.Error(),
@@ -265,27 +247,12 @@ func uploadWeeklyMeal(context *gin.Context) {
 		return
 	}
 
-	// Print parsed records
-	for _, record := range records {
-		if len(record) != 2 {
-			context.JSON(http.StatusBadRequest, models.ApiResult{
-				StatusCode: http.StatusBadRequest,
-				Error:      "CSV must have 2 columns",
-			})
-			return
-		}
-	}
-
-	for _, record := range records {
-		date, description := record[0], record[1]
-		err := mealRepository.CreateMeal(&models.Meal{Date: date, Description: description})
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, models.ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      err.Error(),
-			})
-			return
-		}
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+		return
 	}
 
 	context.JSON(http.StatusOK, models.ApiResult{
@@ -293,20 +260,7 @@ func uploadWeeklyMeal(context *gin.Context) {
 	})
 }
 
-func parseCSV(input string) ([][]string, error) {
-	r := csv.NewReader(strings.NewReader(input))
-
-	r.FieldsPerRecord = 2
-
-	records, err := r.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing CSV: %v", err)
-	}
-
-	return records, nil
-}
-
-func getMeals(context *gin.Context) {
+func HandleGetMeals(context *gin.Context) {
 	startDate := context.Query("startDate")
 	endDate := context.Query("endDate")
 
@@ -318,14 +272,14 @@ func getMeals(context *gin.Context) {
 		return
 	}
 
-	meals, err := mealRepository.GetMealsByDates(startDate, endDate)
+	meals, err := mealService.GetMealsByDates(startDate, endDate)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ApiResult{
 			StatusCode: http.StatusInternalServerError,
 			Error:      err.Error(),
 		})
 		return
-	 }
+	}
 
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
