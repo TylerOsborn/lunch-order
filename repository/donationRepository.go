@@ -1,93 +1,61 @@
 package repository
 
 import (
-	"database/sql"
 	"log"
-	. "lunchorder/models"
+	"lunchorder/models"
+
+	"gorm.io/gorm"
 )
 
 type DonationRepository struct {
-	db *sql.DB
+	db             *gorm.DB
+	userRepository *UserRepository
 }
 
 var donationRepository *DonationRepository
 
-func NewDonationRepository(db *sql.DB) *DonationRepository {
+func NewDonationRepository(db *gorm.DB, userRepository *UserRepository) *DonationRepository {
 	if donationRepository == nil {
 		donationRepository = &DonationRepository{
-			db: db,
-		}	
+			db:             db,
+			userRepository: userRepository,
+		}
 	}
 
 	return donationRepository
 }
 
-func (r *DonationRepository) CreateDonation(donation *Donation) error {
-	_, err := r.db.Exec("INSERT INTO donation (name, description) VALUES (?, ?)", donation.Name, donation.Description)
-	if err != nil {
-		log.Println("Failed to create donation:", err)
-		return err
-	}
+func (r *DonationRepository) CreateDonation(donation *models.Donation) error {
+	result := r.db.Create(&donation)
 
-	return nil
+	return result.Error
 }
 
-func (r *DonationRepository) ClaimDonation(donationId int) (bool, error) {
-	result, err := r.db.Exec("UPDATE donation SET claimed = 1 WHERE id = ? AND claimed = 0", donationId)
-	if err != nil {
-		log.Println("Failed to claim donation:", err)
-		return false, err
+func (r *DonationRepository) ClaimDonation(donationId uint, user *models.User) (bool, error) {
+
+	result := r.db.Exec("UPDATE donations SET recipient_id = ? WHERE id = ? AND (recipient_id = 0 OR recipient_id IS NULL)", user.ID, donationId)
+	if result.Error != nil {
+		log.Println("Failed to claim donation:", result.Error)
+		return false, result.Error
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-
-	return rowsAffected > 0, nil
+	return result.RowsAffected > 0, nil
 }
 
-func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donation, error) {
-	rows, err := r.db.Query("SELECT DISTINCT description, name, id FROM donation WHERE claimed = 0 AND date = ? GROUP BY description ORDER BY description", date)
-	if err != nil {
-		log.Println("Failed to get unclaimed donations:", err)
-		return nil, err
-	}
-	defer rows.Close()
+func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]models.UnclaimedDonation, error) {
+	var unclaimedDonations []models.UnclaimedDonation
 
-	var donations []Donation
+	result := r.db.Raw("SELECT DISTINCT meals.description, users.name AS donor_name, donations.id FROM donations INNER JOIN meals ON donations.meal_id = meals.id INNER JOIN users ON donations.donor_id = users.id WHERE (recipient_id <= 0  OR recipient_id IS NULL) AND meals.date = ? GROUP BY description ORDER BY description", date).Scan(&unclaimedDonations)
 
-	for rows.Next() {
-		var donation Donation
-		err := rows.Scan(&donation.Description, &donation.Name, &donation.Id)
-		if err != nil {
-			return nil, err
-		}
-		donations = append(donations, donation)
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
-
-	return donations, nil
+	return unclaimedDonations, nil
 }
 
-func (r *DonationRepository) GetUnclaimedDonations() ([]Donation, error) {
-	rows, err := r.db.Query("SELECT DISTINCT description, name, id FROM donation WHERE claimed = 0 GROUP BY description ORDER BY description")
-	if err != nil {
-		log.Println("Failed to get unclaimed donations:", err)
-		return nil, err
-	}
-	defer rows.Close()
+func (r *DonationRepository) GetDonationsSummaryByDate(date string, donationClaimSummaries *[]models.DonationClaimSummary) error {
+	tx := r.db.Raw("SELECT donations.recipient_id > 0 AS claimed, meals.description AS description, donors.name AS donor_name, COALESCE(recipients.name, 'UNCLAIMED') AS recipient_name FROM donations INNER JOIN users donors ON donors.id = donations.donor_id LEFT JOIN users recipients ON recipients.id = donations.recipient_id INNER JOIN meals ON donations.meal_id = meals.id WHERE meals.date = ?", date).Scan(&donationClaimSummaries)
 
-	var donations []Donation
-
-	for rows.Next() {
-		var donation Donation
-		err := rows.Scan(&donation.Description, &donation.Name, &donation.Id)
-		if err != nil {
-			return nil, err
-		}
-		donations = append(donations, donation)
-	}
-
-	return donations, nil
+	return tx.Error
 }

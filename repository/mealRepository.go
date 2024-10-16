@@ -1,20 +1,19 @@
 package repository
 
 import (
-	"database/sql"
-	"lunchorder/constants"
 	"lunchorder/models"
-	"time"
+
+	"gorm.io/gorm"
 )
 
 
 type MealRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
 var mealRepository *MealRepository
 
-func NewMealRepository(db *sql.DB) *MealRepository {
+func NewMealRepository(db *gorm.DB) *MealRepository {
 	if mealRepository == nil {
 		mealRepository = &MealRepository{
 			db: db,
@@ -25,31 +24,29 @@ func NewMealRepository(db *sql.DB) *MealRepository {
 }
 
 func (r *MealRepository) CreateMeal(meal *models.Meal) error {
-	_, err := r.db.Exec("INSERT INTO meal (date, description) VALUES (?, ?)", meal.Date, meal.Description)
-	if err != nil {
-		return err
+	var existingMeal models.Meal
+	result := r.db.First(&existingMeal, "description = ? AND date = ?", meal.Description, meal.Date)
+
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return result.Error
 	}
 
-	return nil
+	if existingMeal.ID != 0 {
+		return nil
+	}
+
+	result = r.db.Create(meal)
+
+	return result.Error
 }
 
 func (r *MealRepository) GetMealsByDate(date string) ([]models.Meal, error) {
-	rows, err := r.db.Query("SELECT id, description, date FROM meal WHERE date = ?", date)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var meals []models.Meal
 
-	for rows.Next() {
-		var meal models.Meal
-		err := rows.Scan(&meal.Id, &meal.Description, &meal.Date)
-		if err != nil {
-			return nil, err
-		}
-		meal.Date = time.Now().Format(constants.DATE_FORMAT)
-		meals = append(meals, meal)
+	result := r.db.Find(&meals, "date = ?", date)
+	
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return meals, nil
@@ -57,22 +54,12 @@ func (r *MealRepository) GetMealsByDate(date string) ([]models.Meal, error) {
 
 func (r *MealRepository) GetMealsByDates(startDate string, endDate string) ([]models.Meal, error) {
 
-	rows, err := r.db.Query("SELECT id, description, date FROM meal WHERE date >= ? AND date <= ?", startDate, endDate)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	var meals []models.Meal
 
-	for rows.Next() {
-		var meal models.Meal
-		err := rows.Scan(&meal.Id, &meal.Description, &meal.Date)
-		if err != nil {
-			return nil, err
-		}
-		meal.Date = time.Now().Format(constants.DATE_FORMAT)
-		meals = append(meals, meal)
+	result := r.db.Where("date >= ? AND date <= ?", startDate, endDate).Find(&meals)
+	
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
 	return meals, nil

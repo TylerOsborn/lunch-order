@@ -102,8 +102,8 @@
           <DataTable scrollable scrollHeight="400px" :value="claimsSummary">
             <Column field="claimed" header="Claimed" />
             <Column field="description" header="Description" />
-            <Column field="donatorName" header="Donator" />
-            <Column field="claimerName" header="Claimer" />
+            <Column field="donorName" header="Donor" />
+            <Column field="recipientName" header="Recipient" />
           </DataTable>
         </div>
       </template>

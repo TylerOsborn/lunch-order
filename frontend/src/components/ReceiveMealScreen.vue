@@ -4,14 +4,14 @@
     <div v-if="availableMeals === null || availableMeals.length === 0">
       <p>There are no meals available at the moment.</p>
     </div>
-    <div class="flex" v-else>
+    <div v-else class="flex">
       <div class="flex-left full-width">
         <InputText
-          class="full-width"
-          :invalid="userNameInputErrorText !== ''"
-          placeholder="Name"
           id="name"
           v-model="name"
+          :invalid="userNameInputErrorText !== ''"
+          class="full-width"
+          placeholder="Name"
         />
         <small v-if="userNameInputErrorText !== ''" class="error-text">{{ userNameInputErrorText }}</small>
       </div>
@@ -24,11 +24,11 @@
         />
         <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
       </div>
-      <Button @click="selectMeal(selectedDonation)" class="full-width"> Select Option </Button>
+      <Button class="full-width" @click="selectMeal(selectedDonation)"> Select Option</Button>
     </div>
-    <Dialog :visible="dialogVisible" modal header="Meal Claimed!">
-      <p>You have claimed "{{ selectedDonation.description }}" from {{ selectedDonation.name }}</p>
-      <Button @click="handleOkayButton" label="Okay" />
+    <Dialog :visible="dialogVisible" header="Meal Claimed!" modal>
+      <p>You have claimed "{{ selectedDonation.description }}" from {{ selectedDonation.donorName }}</p>
+      <Button label="Okay" @click="handleOkayButton" />
     </Dialog>
   </div>
 </template>
@@ -54,8 +54,8 @@
       return {
         availableMeals: [] as Donation[] | null,
         selectedDonation: {
-          description: 'Meal',
-          name: 'John Doe',
+          description: '',
+          donorName: '',
         } as Donation,
         name: '' as string,
         dialogVisible: false as boolean,

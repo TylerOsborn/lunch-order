@@ -21,7 +21,7 @@
           size
           v-model="selectedMealType"
           :options="meals"
-          optionValue="description"
+          optionValue="id"
           optionLabel="description"
           placeholder="Select..."
           id="meal"
@@ -55,7 +55,7 @@
     data() {
       return {
         name: '',
-        selectedMealType: '',
+        selectedMealType: 0,
         meals: [] as Meal[],
 
         userNameInputErrorText: '',
@@ -78,7 +78,7 @@
             this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal options', life: 3000 });
           });
       },
-      validateDonationForm(name: string, selectedMealType: string): boolean {
+      validateDonationForm(name: string, selectedMealType: number): boolean {
         let valid = true;
 
         if (!name || name.trim() === '') {
@@ -91,7 +91,7 @@
           this.userNameInputErrorText = '';
         }
 
-        if (!selectedMealType || selectedMealType.trim() === '') {
+        if (!selectedMealType || selectedMealType === 0) {
           this.mealInputErrorText = 'Please select a meal';
           valid = valid && false;
         } else {
@@ -106,7 +106,7 @@
           return;
         }
         api
-          .post('/Api/Donation', { name: this.name, description: this.selectedMealType })
+          .post('/Api/Donation', { donorName: this.name, mealId: this.selectedMealType })
           .then((response) => {
             if (response.status === 200) {
               this.$toast.add({
