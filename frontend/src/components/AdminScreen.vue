@@ -81,16 +81,8 @@
       monday() {
         return mondayDate();
       },
-      computed: {
-        monday() {
-          return mondayDate();
-        },
-        thursday() {
-          return thursdayDate();
-        },
-        today() {
-          return getTodayDate();
-        },
+      thursday() {
+        return thursdayDate();
       },
       today() {
         return getTodayDate();
