@@ -9,21 +9,21 @@
 </template>
 
 <script lang="ts">
-import Button from "primevue/button";
+  import Button from 'primevue/button';
 
-export default {
-  name: "HomeScreen",
-  components: {
-    Button,
-  },
-};
+  export default {
+    name: 'HomeScreen',
+    components: {
+      Button,
+    },
+  };
 </script>
 
 <style scoped>
-.flex {
-  display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  justify-content: center;
-}
+  .flex {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    justify-content: center;
+  }
 </style>
