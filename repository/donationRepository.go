@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"log"
 	"lunchorder/models"
 
@@ -58,4 +59,24 @@ func (r *DonationRepository) GetDonationsSummaryByDate(date string, donationClai
 	tx := r.db.Raw("SELECT donations.recipient_id > 0 AS claimed, meals.description AS description, donors.name AS donor_name, COALESCE(recipients.name, 'UNCLAIMED') AS recipient_name FROM donations INNER JOIN users donors ON donors.id = donations.donor_id LEFT JOIN users recipients ON recipients.id = donations.recipient_id INNER JOIN meals ON donations.meal_id = meals.id WHERE meals.date = ?", date).Scan(&donationClaimSummaries)
 
 	return tx.Error
+}
+
+func (r *DonationRepository) GetDonationByRecipientIDAndDate(recipientID uint, date string, donation *models.Donation)  error {
+	result := r.db.InnerJoins("Meal", r.db.Where(&models.Meal{Date: date})).Joins("Donor").Where("recipient_id = ?", recipientID).First(&donation)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	return result.Error
+}
+
+func (r *DonationRepository) GetDonationByID(donationID uint) (*models.Donation, error) {
+	var donation models.Donation
+	result := r.db.InnerJoins("Donor").Joins("Recipient").First(&donation, donationID)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &donation, nil
 }

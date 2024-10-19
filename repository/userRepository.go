@@ -31,11 +31,33 @@ func (r *UserRepository) CreateUser(user *models.User) error {
 	return result.Error
 }
 
+func (r *UserRepository) Save(user *models.User) error {
+	result := r.db.Save(user)
+
+	return result.Error
+}
+
 
 func (r *UserRepository) GetUserByName(name string) (*models.User, error) {
 	var user models.User
 
 	result := r.db.First(&user, "name = ?", name)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) GetUserByUUID(uuid string) (*models.User, error) {
+	var user models.User
+
+	if (uuid == "") {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	result := r.db.First(&user, "uuid = ?", uuid)
 
 	if result.Error != nil {
 		return nil, result.Error

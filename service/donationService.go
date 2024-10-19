@@ -2,9 +2,11 @@ package service
 
 import (
 	"errors"
-	"gorm.io/gorm"
 	"lunchorder/models"
 	"lunchorder/repository"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 var ErrDonationNotFound = errors.New("donation not found")
@@ -33,57 +35,74 @@ func NewDonationService(
 	return donationService
 }
 
-func (service *DonationService) CreateDonation(donationRequest *models.APIDonation) error {
-	var donation models.Donation
+func (service *DonationService) CreateDonation(donationRequest *models.APIDonation) (*models.Donation, error) {
+	var donation *models.Donation = &models.Donation{
+	}
 
-	donor, err := service.userRepository.GetUserByName(donationRequest.DonorName)
+	donor, err := service.userRepository.GetUserByUUID(donationRequest.User.UUID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return nil, err
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		donor = &models.User{Name: donationRequest.DonorName}
-		err = service.userRepository.CreateUser(donor)
+		if donationRequest.User.UUID == "" {
+			donationRequest.User.UUID = uuid.NewString()
+		}
+		err = service.userRepository.CreateUser(&donationRequest.User)
+		donor = &donationRequest.User
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	donation.DonorID = donor.ID
 	donation.MealID = donationRequest.MealID
 
-	err = service.donationRepository.CreateDonation(&donation)
+	err = service.donationRepository.CreateDonation(donation)
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return service.donationRepository.GetDonationByID(donation.ID)
 }
 
-func (service *DonationService) ClaimDonation(donationClaim *models.APIRecipient) error {
-	user, err := service.userRepository.GetUserByName(donationClaim.Name)
+func (service *DonationService) ClaimDonation(donationClaim *models.APIRecipient) (*models.Donation, error) {
+	user, err := service.userRepository.GetUserByUUID(donationClaim.User.UUID)
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return nil, err
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		user = &models.User{Name: donationClaim.Name}
-		err = service.userRepository.CreateUser(user)
+		if donationClaim.User.UUID == "" {
+			donationClaim.User.UUID = uuid.NewString()
+		}
+		err = service.userRepository.CreateUser(&donationClaim.User)
+		user = &donationClaim.User
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	success, err := service.donationRepository.ClaimDonation(donationClaim.DonationID, user)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !success {
-		return ErrDonationNotFound
+		return nil, ErrDonationNotFound
 	}
 
-	return nil
+	donation, err := service.donationRepository.GetDonationByID(donationClaim.DonationID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return donation, nil
 }
 
 func (service *DonationService) GetUnclaimedDonationsByDate(today string) ([]models.UnclaimedDonation, error) {
@@ -100,4 +119,14 @@ func (service *DonationService) GetDonationsSummaryByDate(date string) ([]models
 	}
 
 	return donationClaimSummaries, nil
+}
+
+func (service *DonationService) GetDonationByRecipientUUIDAndDate(userUUID string, date string, donation *models.Donation) error {
+	user, err := service.userRepository.GetUserByUUID(userUUID)
+
+	if err != nil {
+		return err
+	}
+
+	return service.donationRepository.GetDonationByRecipientIDAndDate(user.ID, date, donation)
 }

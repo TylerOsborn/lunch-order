@@ -10,18 +10,19 @@ type Meal struct {
 
 type User struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	Name      string    `json:"Name" gorm:"unique not null"`
+	UUID	  string    `json:"uuid" gorm:"unique"`
+	Name      string    `json:"name" gorm:"unique not null"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 
 type APIDonation struct {
 	MealID    uint   `json:"mealId"`
-	DonorName string `json:"donorName"`
+	User      User   `json:"user"`
 }
 
 type APIRecipient struct {
 	DonationID uint   `json:"donationId"`
-	Name       string `json:"name"`
+	User       User   `json:"user"`
 }
 
 type Donation struct {
@@ -34,6 +35,10 @@ type Donation struct {
 	Recipient   User      `json:"recipient" gorm:"foreignKey:RecipientID"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func (donation *Donation) IsEmpty() bool {
+	return donation.ID == 0
 }
 
 type UnclaimedDonation struct {

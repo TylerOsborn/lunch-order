@@ -10,10 +10,17 @@ export interface Meal {
   date: string;
 }
 
-export interface Donation {
+export interface UnclaimedDonation {
   id: number;
   donorName: string;
   description: string;
+}
+
+export interface Donation {
+  id: number;
+  donor: User;
+  recipient: User;
+  meal: Meal;
 }
 
 export interface DonationClaimSummary {
@@ -21,4 +28,9 @@ export interface DonationClaimSummary {
   description: string;
   donorName: string;
   recipientName: string;
+}
+
+export interface User {
+  uuid: string;
+  name: string;
 }
