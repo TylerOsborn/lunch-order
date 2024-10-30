@@ -26,7 +26,6 @@ var userRepository *repository.UserRepository
 
 var donationService *service.DonationService
 var mealService *service.MealService
-var userService *service.UserService
 
 func main() {
 	var err error
@@ -42,7 +41,6 @@ func main() {
 
 	donationService = service.NewDonationService(donationRepository, mealRepository, userRepository)
 	mealService = service.NewMealService(mealRepository)
-	userService = service.NewUserService(userRepository)
 
 	// Route setup
 	r := gin.Default()
@@ -104,14 +102,11 @@ func setupRoutes(r *gin.Engine) {
 	r.GET("/Api/Meal/Today", HandleGetMealsToday)
 
 	r.POST("/Api/Donation", HandleDonateMeal)
-	r.GET("/Api/Donation", HandleGetDonation)
-	r.GET("/Api/Donation/Unclaimed", HandleGetUnclaimedDonations)
+	r.GET("/Api/Donation", HandleGetUnclaimedDonations)
 
 	r.POST("/Api/Donation/Claim", HandleDonationClaim)
 
 	r.GET("/Api/Stats/Claims/Summary", HandleGetDonationSummary)
-
-	r.POST("/Api/User", HandleCreateUser)
 }
 
 func HandleGetDonationSummary(context *gin.Context) {
@@ -148,7 +143,7 @@ func HandleDonationClaim(context *gin.Context) {
 		return
 	}
 
-	donation, err := donationService.ClaimDonation(&donationClaim)
+	err = donationService.ClaimDonation(&donationClaim)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
@@ -160,7 +155,6 @@ func HandleDonationClaim(context *gin.Context) {
 
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
-		Data: 	 donation.Recipient,
 	})
 }
 
@@ -197,7 +191,7 @@ func HandleDonateMeal(context *gin.Context) {
 		return
 	}
 
-	donation, err := donationService.CreateDonation(&donationRequest)
+	err = donationService.CreateDonation(&donationRequest)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
@@ -209,52 +203,6 @@ func HandleDonateMeal(context *gin.Context) {
 
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
-		Data: 	 donation.Donor,
-	})
-}
-
-func HandleGetDonation(context *gin.Context) {
-	recipientUUID := context.Query("recipientUUID")
-	date := context.Query("date")
-
-	if recipientUUID == "" {
-		context.JSON(http.StatusOK, models.ApiResult{
-			StatusCode: http.StatusOK,
-			Data:       nil,
-		})
-		return
-	}
-
-	if date == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "recipientUUID and date are required query parameters",
-		})
-		return
-	}
-
-	var donation models.Donation
-	err := donationService.GetDonationByRecipientUUIDAndDate(recipientUUID, date, &donation)
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	if donation.IsEmpty() {
-		context.JSON(http.StatusOK, models.ApiResult{
-			StatusCode: http.StatusOK,
-			Data:       nil,
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       donation,
 	})
 }
 
@@ -338,31 +286,4 @@ func HandleGetMeals(context *gin.Context) {
 		Data:       meals,
 	})
 
-}
-
-func HandleCreateUser(gin *gin.Context) {
-	var user models.User
-	err := gin.BindJSON(&user)
-	if err != nil {
-		gin.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	err = userService.SaveEmpty(&user)
-
-	if err != nil {
-		gin.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	gin.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       user.UUID,
-	})
 }

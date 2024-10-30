@@ -3,7 +3,7 @@
   <router-view></router-view>
 </template>
 
-<script lang="ts">
+<script>
   import Toast from 'primevue/toast';
 
   export default {

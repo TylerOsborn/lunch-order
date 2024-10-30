@@ -40,9 +40,14 @@
   import FloatLabel from 'primevue/floatlabel';
   import Button from 'primevue/button';
   import InputText from 'primevue/inputtext';
-  import { ApiResult, Meal } from '../models/models.ts';
+  import { ApiResult, Meal, User } from '../models/models.ts';
   import api from '../axios/axios.ts';
-  import { getNameFromCookie, setNameCookie } from '../utils/utils.ts';
+  import {
+    getNameFromLocalStorage,
+    setNameToLocalStorage,
+    getUUIDFromLocalStorage,
+    setUUIDToLocalStorage,
+  } from '../utils/utils.ts';
 
   export default {
     name: 'GiveMealScreen',
@@ -55,6 +60,7 @@
     data() {
       return {
         name: '',
+        uuid: '',
         selectedMealType: 0,
         meals: [] as Meal[],
 
@@ -63,8 +69,9 @@
       };
     },
     mounted() {
+      this.name = getNameFromLocalStorage();
+      this.uuid = getUUIDFromLocalStorage();
       this.getMeals();
-      this.name = getNameFromCookie();
     },
     methods: {
       getMeals() {
@@ -106,9 +113,19 @@
           return;
         }
         api
-          .post('/Api/Donation', { donorName: this.name, mealId: this.selectedMealType })
+          .post('/Api/Donation', {
+            mealId: this.selectedMealType,
+            user: {
+              uuid: this.uuid,
+              name: this.name,
+            },
+          })
           .then((response) => {
             if (response.status === 200) {
+              const result: ApiResult<User> = response.data;
+              const uuid = result.data.uuid;
+              setUUIDToLocalStorage(uuid);
+
               this.$toast.add({
                 severity: 'success',
                 summary: 'Success',
@@ -123,7 +140,7 @@
           .catch((_) => {
             this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Unable to donate meal', life: 3000 });
           });
-        setNameCookie(this.name);
+        setNameToLocalStorage(this.name);
       },
     },
   };

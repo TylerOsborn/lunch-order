@@ -32,18 +32,26 @@ export function getTodayDate() {
   return `${year}-${month}-${date}`;
 }
 
-export function getNameFromLocalStorage(): string {
-  return localStorage.getItem('name') || '';
+export function setNameCookie(name: string) {
+  const d = new Date();
+  d.setTime(d.getTime() + 365 * 24 * 60 * 60 * 1000); // 1 year expiration
+  const expires = 'expires=' + d.toUTCString();
+  document.cookie = 'username=' + name + ';' + expires + ';path=/';
 }
 
-export function setNameToLocalStorage(name: string) {
-  localStorage.setItem('name', name);
-}
+export function getNameFromCookie(): string {
+  const name = 'username=';
+  const decodedCookie = decodeURIComponent(document.cookie);
+  const ca = decodedCookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
 
-export function getUUIDFromLocalStorage(): string {
-  return localStorage.getItem('uuid') || '';
-}
-
-export function setUUIDToLocalStorage(uuid: string) {
-  localStorage.setItem('uuid', uuid);
+  return '';
 }

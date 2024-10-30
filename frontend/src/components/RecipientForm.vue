@@ -1,31 +1,25 @@
 <template>
-  <div>
-    <h2>Receive a Meal</h2>
-    <div v-if="availableMeals === null || availableMeals.length === 0">
-      <p>There are no meals available at the moment.</p>
+  <div class="flex">
+    <div class="flex-left full-width">
+      <InputText
+        id="name"
+        v-model="name"
+        :invalid="userNameInputErrorText !== ''"
+        class="full-width"
+        placeholder="Name"
+      />
+      <small v-if="userNameInputErrorText !== ''" class="error-text">{{ userNameInputErrorText }}</small>
     </div>
-    <div v-else class="flex">
-      <div class="flex-left full-width">
-        <InputText
-          id="name"
-          v-model="name"
-          :invalid="userNameInputErrorText !== ''"
-          class="full-width"
-          placeholder="Name"
-        />
-        <small v-if="userNameInputErrorText !== ''" class="error-text">{{ userNameInputErrorText }}</small>
-      </div>
-      <div class="flex-left full-width">
-        <Listbox
-          v-model="selectedDonation"
-          :invalid="mealInputErrorText !== ''"
-          :options="availableMeals"
-          optionLabel="description"
-        />
-        <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
-      </div>
-      <Button class="full-width" @click="selectMeal(selectedDonation)"> Select Option</Button>
+    <div class="flex-left full-width">
+      <Listbox
+        v-model="selectedDonation"
+        :invalid="mealInputErrorText !== ''"
+        :options="availableMeals"
+        optionLabel="description"
+      />
+      <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
     </div>
+    <Button class="full-width" @click="selectMeal(selectedDonation)"> Select Option</Button>
     <Dialog :visible="dialogVisible" header="Meal Claimed!" modal>
       <p>You have claimed "{{ selectedDonation.description }}" from {{ selectedDonation.donorName }}</p>
       <Button label="Okay" @click="handleOkayButton" />
@@ -38,26 +32,41 @@
   import InputText from 'primevue/inputtext';
   import Button from 'primevue/button';
   import Dialog from 'primevue/dialog';
-  import api from '../axios/axios.ts';
-  import { ApiResult, Donation } from '../models/models.ts';
-  import { getNameFromCookie, setNameCookie } from '../utils/utils.ts';
+  import api from '../axios/axios';
+  import { ApiResult, User } from '../models/models';
+  import {
+    setUUIDToLocalStorage,
+    setNameToLocalStorage,
+    getNameFromLocalStorage,
+    getUUIDFromLocalStorage,
+  } from '../utils/utils';
+  import { UnclaimedDonation, Donation } from '../models/models';
 
   export default {
-    name: 'ReceiveMealScreen',
+    name: 'RecipientForm',
     components: {
       Listbox,
       Button,
       InputText,
       Dialog,
     },
+    props: {
+      availableMeals: {
+        type: Array<UnclaimedDonation>,
+        required: false,
+        default: [],
+      },
+    },
     data() {
       return {
-        availableMeals: [] as Donation[] | null,
+        availableMeals: [] as UnclaimedDonation[] | null,
+        claimedMeal: null as Donation | null,
         selectedDonation: {
           description: '',
           donorName: '',
-        } as Donation,
+        } as UnclaimedDonation,
         name: '' as string,
+        uuid: '' as string,
         dialogVisible: false as boolean,
 
         userNameInputErrorText: '',
@@ -65,25 +74,14 @@
       };
     },
     mounted() {
-      this.getAvailableMeals();
-      this.name = getNameFromCookie();
+      this.name = getNameFromLocalStorage();
+      this.uuid = getUUIDFromLocalStorage();
     },
     methods: {
-      getAvailableMeals() {
-        api
-          .get(`/Api/Donation?timestamp=${new Date().getTime()}`)
-          .then((response) => {
-            let result: ApiResult<Donation[]> = response.data;
-            this.availableMeals = result.data;
-          })
-          .catch((_) => {
-            this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal options', life: 3000 });
-          });
-      },
       handleOkayButton() {
         this.$router.push('/');
       },
-      validateDonationClaim(name: string, donation: Donation): boolean {
+      validateDonationClaim(name: string, donation: UnclaimedDonation): boolean {
         let valid = true;
 
         const id = donation?.id;
@@ -108,30 +106,37 @@
 
         return valid;
       },
-      selectMeal(donation: Donation) {
+      selectMeal(donation: UnclaimedDonation) {
         const valid = this.validateDonationClaim(this.name, donation);
         if (!valid) {
           return;
         }
-
         api
           .post('/Api/Donation/Claim', {
             donationId: donation.id,
-            name: this.name,
+            user: {
+              uuid: this.uuid,
+              name: this.name,
+            },
           })
           .then((response) => {
+            const result: ApiResult<User> = response.data;
+            const uuid = result.data.uuid;
+            setUUIDToLocalStorage(uuid);
+
             if (response.status === 200) {
               this.dialogVisible = true;
               return;
             }
             this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Unable to claim meal', life: 3000 });
-            this.getAvailableMeals();
+            this.$emit('reloadMeals');
           })
           .catch((_) => {
             this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Unable to claim meal', life: 3000 });
-            this.getAvailableMeals();
+            this.$emit('reloadMeals');
           });
-        setNameCookie(this.name);
+
+        setNameToLocalStorage(this.name);
       },
     },
   };
