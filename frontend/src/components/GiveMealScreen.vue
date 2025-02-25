@@ -18,7 +18,7 @@
       <div class="flex-left full-width">
         <Listbox
             class="full-width"
-            :class="{ 'invalid': mealInputErrorText !== '' }"
+            :invalid="mealInputErrorText !== ''"
             v-model="selectedMealType"
             :options="meals"
             optionValue="id"
