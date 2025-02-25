@@ -1,94 +1,73 @@
-<script lang="ts">
-  import api from '../axios/axios.ts';
-  import { ApiResult, DonationClaimSummary, Meal } from '../models/models.ts';
-  import { getTodayDate, mondayDate, thursdayDate } from '../utils/utils.ts';
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
+import api from '../axios/axios.ts';
+import { ApiResult, DonationClaimSummary, Meal } from '../models/models.ts';
+import { getTodayDate, mondayDate, thursdayDate } from '../utils/utils.ts';
 
-  import Card from 'primevue/card';
-  import Listbox from 'primevue/listbox';
-  import FileUpload from 'primevue/fileupload';
-  import Divider from 'primevue/divider';
-  import DataTable from 'primevue/datatable';
-  import Column from 'primevue/column';
-  import Textarea from 'primevue/textarea';
-  import Button from 'primevue/button';
+import Card from 'primevue/card';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Textarea from 'primevue/textarea';
+import Button from 'primevue/button';
+import Divider from 'primevue/divider';
+import { useToast } from 'primevue/usetoast';
 
-  export default {
-    name: 'AdminScreen',
-    components: {
-      Card,
-      Listbox,
-      FileUpload,
-      Divider,
-      DataTable,
-      Column,
-      Textarea,
-      Button,
-    },
-    data() {
-      return {
-        meals: [] as Meal[],
-        newMeals: '' as string,
-        claimsSummary: [] as DonationClaimSummary[],
-      };
-    },
-    mounted() {
-      this.getMeals();
-      this.getClaimsSummary();
-    },
-    methods: {
-      submitMeal() {
-        api
-          .post('/Api/Meal/Upload', { csv: this.newMeals })
-          .then((response) => {
-            console.log('Meal uploaded:', response.data);
-          })
-          .then(() => {
-            this.getMeals();
-            this.newMeals = '';
-          })
-          .catch((error) => {
-            console.log(error);
-          });
-      },
-      getMeals() {
-        api
-          .get(`/Api/Meal?startDate=${this.monday}&endDate=${this.thursday}`)
-          .then((response) => {
-            let result: ApiResult<Meal[]> = response.data;
-            this.meals = result.data;
-          })
-          .catch((error) => {
-            console.log(error);
-          });
-      },
-      getClaimsSummary() {
-        api
-          .get(`/Api/Stats/Claims/Summary?date=${this.today}&timestamp=${new Date().getTime()}`)
-          .then((response) => {
-            let result: ApiResult<DonationClaimSummary[]> = response.data;
-            if (result.error) {
-              this.$toast.add({ severity: 'error', summary: 'Error', detail: result.error });
-              return;
-            }
-            this.claimsSummary = result.data;
-          })
-          .catch((error) => {
-            this.$toast.add({ severity: 'error', summary: 'Error', detail: `Error: ${error}` });
-          });
-      },
-    },
-    computed: {
-      monday() {
-        return mondayDate();
-      },
-      thursday() {
-        return thursdayDate();
-      },
-      today() {
-        return getTodayDate();
-      },
-    },
-  };
+const toast = useToast();
+const queryClient = useQueryClient();
+
+const newMeals = ref('');
+
+const monday = computed(() => mondayDate());
+const thursday = computed(() => thursdayDate());
+const today = computed(() => getTodayDate());
+
+const { data: meals = [] } = useQuery({
+  queryKey: ['meals', monday.value, thursday.value],
+  queryFn: async () => {
+    const { data } = await api.get(`/Api/Meal?startDate=${monday.value}&endDate=${thursday.value}`);
+    const result: ApiResult<Meal[]> = data;
+    return result.data;
+  }
+});
+
+const { data: claimsSummary = [] } = useQuery({
+  queryKey: ['claimsSummary', today.value],
+  queryFn: async () => {
+    try {
+      const { data } = await api.get(`/Api/Stats/Claims/Summary?date=${today.value}&timestamp=${new Date().getTime()}`);
+      const result: ApiResult<DonationClaimSummary[]> = data;
+
+      if (result.error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: result.error });
+        return [];
+      }
+
+      return result.data;
+    } catch (error) {
+      toast.add({ severity: 'error', summary: 'Error', detail: `Error: ${error}` });
+      return [];
+    }
+  }
+});
+
+const { mutate: submitMeal } = useMutation({
+  mutationFn: async () => {
+    return api.post('/Api/Meal/Upload', { csv: newMeals.value });
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['meals'] });
+    newMeals.value = '';
+  },
+  onError: (error) => {
+    console.error(error);
+    toast.add({ severity: 'error', summary: 'Error', detail: `Error: ${error}` });
+  }
+});
+
+const handleSubmitMeal = () => {
+  submitMeal();
+};
 </script>
 
 <template>
@@ -121,7 +100,7 @@
         <h3>Upload Weekly Meals</h3>
         <form>
           <Textarea rows="10" cols="72" v-model="newMeals" placeholder="Enter weekly meals here" />
-          <Button type="submit" class="sub-button" @click.prevent="submitMeal">Submit</Button>
+          <Button type="submit" class="sub-button" @click.prevent="handleSubmitMeal">Submit</Button>
         </form>
       </template>
     </Card>
