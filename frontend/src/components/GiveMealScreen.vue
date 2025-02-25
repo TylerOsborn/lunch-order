@@ -61,13 +61,11 @@ const toast = useToast();
 const router = useRouter();
 const queryClient = useQueryClient();
 
-// Form state
 const name = ref(getNameFromCookie());
 const selectedMealType = ref(0);
 const userNameInputErrorText = ref('');
 const mealInputErrorText = ref('');
 
-// Fetch meals query
 const { isPending, data: mealsResult } = useQuery({
   queryKey: ['meals', 'today'],
   queryFn: async (): Promise<ApiResult<Meal[]>> => {
