@@ -1,140 +1,155 @@
 <template>
   <div>
     <h2>Receive a Meal</h2>
-    <div v-if="availableMeals === null || availableMeals.length === 0">
+    <div v-if="isMealsPending">
+      <p>Loading available meals...</p>
+    </div>
+    <div v-else-if="isMealsError">
+      <p>Error loading meals. Please try again later.</p>
+    </div>
+    <div v-else-if="mealsData && mealsData.length === 0">
       <p>There are no meals available at the moment.</p>
     </div>
     <div v-else class="flex">
       <div class="flex-left full-width">
         <InputText
-          id="name"
-          v-model="name"
-          :invalid="userNameInputErrorText !== ''"
-          class="full-width"
-          placeholder="Name"
+            id="name"
+            v-model="name"
+            :invalid="userNameInputError !== ''"
+            class="full-width"
+            placeholder="Name"
         />
-        <small v-if="userNameInputErrorText !== ''" class="error-text">{{ userNameInputErrorText }}</small>
+        <small v-if="userNameInputError !== ''" class="error-text">{{ userNameInputError }}</small>
       </div>
       <div class="flex-left full-width">
         <Listbox
-          v-model="selectedDonation"
-          :invalid="mealInputErrorText !== ''"
-          :options="availableMeals"
-          optionLabel="description"
+            v-model="selectedDonation"
+            :invalid="mealInputError !== ''"
+            :options="mealsData"
+            optionLabel="description"
+            class="full-width"
         />
-        <small v-if="mealInputErrorText !== ''" class="error-text">{{ mealInputErrorText }}</small>
+        <small v-if="mealInputError !== ''" class="error-text">{{ mealInputError }}</small>
       </div>
-      <Button class="full-width" @click="selectMeal(selectedDonation)"> Select Option</Button>
+      <Button
+          class="full-width"
+          @click="selectMeal"
+      >
+        Select Option
+      </Button>
     </div>
     <Dialog :visible="dialogVisible" header="Meal Claimed!" modal>
-      <p>You have claimed "{{ selectedDonation.description }}" from {{ selectedDonation.donorName }}</p>
-      <Button label="Okay" @click="handleOkayButton" />
+      <p v-if="selectedDonation">You have claimed "{{ selectedDonation.description }}" from {{ selectedDonation.donorName }}</p>
+      <template #footer>
+        <Button label="Okay" @click="handleOkayButton" />
+      </template>
     </Dialog>
   </div>
 </template>
 
-<script lang="ts">
-  import Listbox from 'primevue/listbox';
-  import InputText from 'primevue/inputtext';
-  import Button from 'primevue/button';
-  import Dialog from 'primevue/dialog';
-  import api from '../axios/axios.ts';
-  import { ApiResult, Donation } from '../models/models.ts';
-  import { getNameFromCookie, setNameCookie } from '../utils/utils.ts';
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
+import Listbox from 'primevue/listbox';
+import InputText from 'primevue/inputtext';
+import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
+import { useToast } from 'primevue/usetoast';
+import api from '../axios/axios';
+import { getNameFromCookie, setNameCookie } from '../utils/utils';
+import type { ApiResult, Donation } from '../models/models';
 
-  export default {
-    name: 'ReceiveMealScreen',
-    components: {
-      Listbox,
-      Button,
-      InputText,
-      Dialog,
-    },
-    data() {
-      return {
-        availableMeals: [] as Donation[] | null,
-        selectedDonation: {
-          description: '',
-          donorName: '',
-        } as Donation,
-        name: '' as string,
-        dialogVisible: false as boolean,
+const router = useRouter();
+const toast = useToast();
+const queryClient = useQueryClient();
 
-        userNameInputErrorText: '',
-        mealInputErrorText: '',
-      };
-    },
-    mounted() {
-      this.getAvailableMeals();
-      this.name = getNameFromCookie();
-    },
-    methods: {
-      getAvailableMeals() {
-        api
-          .get(`/Api/Donation?timestamp=${new Date().getTime()}`)
-          .then((response) => {
-            let result: ApiResult<Donation[]> = response.data;
-            this.availableMeals = result.data;
-          })
-          .catch((_) => {
-            this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal options', life: 3000 });
-          });
-      },
-      handleOkayButton() {
-        this.$router.push('/');
-      },
-      validateDonationClaim(name: string, donation: Donation): boolean {
-        let valid = true;
+const name = ref(getNameFromCookie() || '');
+const selectedDonation = ref<Donation>({} as Donation);
+const dialogVisible = ref(false);
+const userNameInputError = ref('');
+const mealInputError = ref('');
 
-        const id = donation?.id;
-        const description = donation?.description;
+const {isPending: isMealsPending, data: mealsData, isError: isMealsError} = useQuery({
+  queryKey: ['availableMeals'],
+  queryFn: async (): Promise<Donation[]> => {
+    try {
+      const response = await api.get(`/Api/Donation?timestamp=${new Date().getTime()}`);
+      const result: ApiResult<Donation[]> = response.data;
+      return result.data || [];
+    } catch (error) {
+      toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal options', life: 3000 });
+      throw error;
+    }
+  },
+  refetchOnWindowFocus: true,
+  staleTime: 60000
+});
 
-        if (!name || name.trim() === '') {
-          this.userNameInputErrorText = 'Please enter a name';
-          valid = valid && false;
-        } else if (!/^(\w+\s?){1,5}$/.test(name)) {
-          this.userNameInputErrorText = 'Please enter a valid name';
-          valid = valid && false;
-        } else {
-          this.userNameInputErrorText = '';
-        }
+const claimMutation = useMutation({
+  mutationFn: async ({ donationId, name }: { donationId: number, name: string }) => {
+    return await api.post('/Api/Donation/Claim', {
+      donationId,
+      name
+    });
+  },
+  onSuccess: () => {
+    dialogVisible.value = true;
+    queryClient.invalidateQueries({ queryKey: ['availableMeals'] });
+  },
+  onError: () => {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Unable to claim meal', life: 3000 });
+    queryClient.invalidateQueries({ queryKey: ['availableMeals'] });
+  }
+});
 
-        if (id == null || id <= 0 || description == null || description.trim() === '') {
-          this.mealInputErrorText = 'Please select a meal';
-          valid = valid && false;
-        } else {
-          this.mealInputErrorText = '';
-        }
+const validateDonationClaim = (userName: string, donation: Donation): boolean => {
+  let valid = true;
 
-        return valid;
-      },
-      selectMeal(donation: Donation) {
-        const valid = this.validateDonationClaim(this.name, donation);
-        if (!valid) {
-          return;
-        }
+  const id = donation?.id;
+  const description = donation?.description;
 
-        api
-          .post('/Api/Donation/Claim', {
-            donationId: donation.id,
-            name: this.name,
-          })
-          .then((response) => {
-            if (response.status === 200) {
-              this.dialogVisible = true;
-              return;
-            }
-            this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Unable to claim meal', life: 3000 });
-            this.getAvailableMeals();
-          })
-          .catch((_) => {
-            this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Unable to claim meal', life: 3000 });
-            this.getAvailableMeals();
-          });
-        setNameCookie(this.name);
-      },
-    },
-  };
+  if (!userName || userName.trim() === '') {
+    userNameInputError.value = 'Please enter a name';
+    valid = false;
+  } else if (!/^(\w+\s?){1,5}$/.test(userName)) {
+    userNameInputError.value = 'Please enter a valid name';
+    valid = false;
+  } else {
+    userNameInputError.value = '';
+  }
+
+  if (id == null || id <= 0 || description == null || description.trim() === '') {
+    mealInputError.value = 'Please select a meal';
+    valid = false;
+  } else {
+    mealInputError.value = '';
+  }
+
+  return valid;
+};
+
+const selectMeal = () => {
+  if (!validateDonationClaim(name.value, selectedDonation.value)) {
+    return;
+  }
+
+  setNameCookie(name.value);
+
+  claimMutation.mutate({
+    donationId: selectedDonation.value.id,
+    name: name.value
+  });
+};
+
+const handleOkayButton = () => {
+  router.push('/');
+};
+
+// Lifecycle hooks
+onMounted(() => {
+  // Initial name is already set in ref initialization
+});
 </script>
 
 <style scoped>
