@@ -42,6 +42,10 @@ type UnclaimedDonation struct {
 	Description string `json:"description"`
 }
 
+type ClaimedDonation struct {
+	UnclaimedDonation
+}
+
 type ApiResult struct {
 	StatusCode int         `json:"statusCode"`
 	Error      string      `json:"error"`

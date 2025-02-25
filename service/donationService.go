@@ -101,3 +101,13 @@ func (service *DonationService) GetDonationsSummaryByDate(date string) ([]models
 
 	return donationClaimSummaries, nil
 }
+
+func (service *DonationService) GetDonationClaimByClaimantName(name string) (models.ClaimedDonation, error) {
+	donation, err := service.donationRepository.GetDonationClaimByClaimantName(name)
+
+	if err != nil {
+		return models.ClaimedDonation{}, err
+	}
+
+	return donation, nil
+}

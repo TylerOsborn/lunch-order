@@ -1,7 +1,10 @@
 <template>
   <div>
     <h2>Receive a Meal</h2>
-    <div v-if="isMealsPending">
+    <div v-if="!isChosenMealsError && !isChosenMealsPending && chosenMealsData">
+      <p>you have selected "{{chosenMealsData.description}}" from {{chosenMealsData.donorName}}</p>
+    </div>
+    <div v-else-if="isMealsPending">
       <p>Loading available meals...</p>
     </div>
     <div v-else-if="isMealsError">
@@ -69,6 +72,28 @@ const selectedDonation = ref<Donation>({} as Donation);
 const dialogVisible = ref(false);
 const userNameInputError = ref('');
 const mealInputError = ref('');
+
+const selectedMeal = ref('');
+const selectedMealDonator = ref('');
+
+const {isPending: isChosenMealsPending, data: chosenMealsData, isError: isChosenMealsError} = useQuery({
+  queryKey: ['chosenMeal'],
+  queryFn: async (): Promise<Donation> => {
+    try {
+      const response = await api.get(`/Api/Donation/Claim?name=${name.value}&timestamp=${new Date().getTime()}`);
+      const result: ApiResult<Donation> = response.data;
+      return result.data;
+    } catch (error) {
+
+      if (error.response.status == 404) {
+        return;
+      }
+
+      throw error;
+    }
+  },
+  refetchOnWindowFocus: false,
+});
 
 const {isPending: isMealsPending, data: mealsData, isError: isMealsError} = useQuery({
   queryKey: ['availableMeals'],
