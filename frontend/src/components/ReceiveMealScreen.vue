@@ -2,7 +2,7 @@
   <div>
     <h2>Receive a Meal</h2>
     <div v-if="!isChosenMealsError && !isChosenMealsPending && chosenMealsData">
-      <p>you have selected "{{chosenMealsData.description}}" from {{chosenMealsData.donorName}}</p>
+      <p>You have selected "{{chosenMealsData.description}}" from {{chosenMealsData.donorName}}</p>
     </div>
     <div v-else-if="isMealsPending">
       <p>Loading available meals...</p>
