@@ -73,20 +73,17 @@ const dialogVisible = ref(false);
 const userNameInputError = ref('');
 const mealInputError = ref('');
 
-const selectedMeal = ref('');
-const selectedMealDonator = ref('');
-
 const {isPending: isChosenMealsPending, data: chosenMealsData, isError: isChosenMealsError} = useQuery({
   queryKey: ['chosenMeal'],
-  queryFn: async (): Promise<Donation> => {
+  queryFn: async (): Promise<Donation | null> => {
     try {
       const response = await api.get(`/Api/Donation/Claim?name=${name.value}&timestamp=${new Date().getTime()}`);
       const result: ApiResult<Donation> = response.data;
       return result.data;
-    } catch (error) {
+    } catch (error: any) {
 
       if (error.response.status == 404) {
-        return;
+        return null;
       }
 
       throw error;
