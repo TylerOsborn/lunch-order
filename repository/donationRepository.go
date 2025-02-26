@@ -3,6 +3,7 @@ package repository
 import (
 	"log"
 	"lunchorder/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -58,4 +59,15 @@ func (r *DonationRepository) GetDonationsSummaryByDate(date string, donationClai
 	tx := r.db.Raw("SELECT donations.recipient_id > 0 AS claimed, meals.description AS description, donors.name AS donor_name, COALESCE(recipients.name, 'UNCLAIMED') AS recipient_name FROM donations INNER JOIN users donors ON donors.id = donations.donor_id LEFT JOIN users recipients ON recipients.id = donations.recipient_id INNER JOIN meals ON donations.meal_id = meals.id WHERE meals.date = ?", date).Scan(&donationClaimSummaries)
 
 	return tx.Error
+}
+
+func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (models.ClaimedDonation, error) {
+	donation := models.ClaimedDonation{}
+	tx := r.db.Raw("SELECT donations.id AS id, meals.description AS description, donor.name AS donor_name FROM donations INNER JOIN meals ON donations.meal_id = meals.id INNER JOIN users recipient ON donations.recipient_id = recipient.id INNER JOIN users donor ON donations.donor_id = donor.id WHERE recipient.name = ? AND recipient_id > 0 AND DATE(donations.created_at) = DATE(?)", name, time.Now()).Scan(&donation)
+
+	if tx.Error != nil {
+		return donation, tx.Error
+	}
+
+	return donation, nil
 }
