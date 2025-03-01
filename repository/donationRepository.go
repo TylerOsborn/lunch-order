@@ -2,7 +2,6 @@ package repository
 
 import (
 	"log"
-	"lunchorder/models"
 	"time"
 
 	"gorm.io/gorm"
@@ -26,13 +25,13 @@ func NewDonationRepository(db *gorm.DB, userRepository *UserRepository) *Donatio
 	return donationRepository
 }
 
-func (r *DonationRepository) CreateDonation(donation *models.Donation) error {
+func (r *DonationRepository) CreateDonation(donation *Donation) error {
 	result := r.db.Create(&donation)
 
 	return result.Error
 }
 
-func (r *DonationRepository) ClaimDonation(donationId uint, user *models.User) (bool, error) {
+func (r *DonationRepository) ClaimDonation(donationId uint, user *User) (bool, error) {
 
 	result := r.db.Exec("UPDATE donations SET recipient_id = ? WHERE id = ? AND (recipient_id = 0 OR recipient_id IS NULL)", user.ID, donationId)
 	if result.Error != nil {
@@ -43,27 +42,28 @@ func (r *DonationRepository) ClaimDonation(donationId uint, user *models.User) (
 	return result.RowsAffected > 0, nil
 }
 
-func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]models.UnclaimedDonation, error) {
-	var unclaimedDonations []models.UnclaimedDonation
+func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donation, error) {
+	var unclaimedDonations []Donation
 
-	result := r.db.Raw("SELECT DISTINCT meals.description, users.name AS donor_name, donations.id FROM donations INNER JOIN meals ON donations.meal_id = meals.id INNER JOIN users ON donations.donor_id = users.id WHERE (recipient_id <= 0  OR recipient_id IS NULL) AND meals.date = ? GROUP BY description ORDER BY description", date).Scan(&unclaimedDonations)
+	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("(recipient_id <= 0 OR recipient_id IS NULL) AND DATE(Meal.date) = DATE(?)", date).Find(&unclaimedDonations)
 
-	if result.Error != nil {
-		return nil, result.Error
+	if tx.Error != nil {
+		return unclaimedDonations, tx.Error
 	}
 
 	return unclaimedDonations, nil
 }
 
-func (r *DonationRepository) GetDonationsSummaryByDate(date string, donationClaimSummaries *[]models.DonationClaimSummary) error {
-	tx := r.db.Raw("SELECT donations.recipient_id > 0 AS claimed, meals.description AS description, donors.name AS donor_name, COALESCE(recipients.name, 'UNCLAIMED') AS recipient_name FROM donations INNER JOIN users donors ON donors.id = donations.donor_id LEFT JOIN users recipients ON recipients.id = donations.recipient_id INNER JOIN meals ON donations.meal_id = meals.id WHERE meals.date = ?", date).Scan(&donationClaimSummaries)
+func (r *DonationRepository) GetDonationsSummaryByDate(date string) (*[]Donation, error) {
+	var donations []Donation
+	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("DATE(donations.created_at) = DATE(?)", date).Find(&donations)
 
-	return tx.Error
+	return &donations, tx.Error
 }
 
-func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (models.ClaimedDonation, error) {
-	donation := models.ClaimedDonation{}
-	tx := r.db.Raw("SELECT donations.id AS id, meals.description AS description, donor.name AS donor_name FROM donations INNER JOIN meals ON donations.meal_id = meals.id INNER JOIN users recipient ON donations.recipient_id = recipient.id INNER JOIN users donor ON donations.donor_id = donor.id WHERE recipient.name = ? AND recipient_id > 0 AND DATE(donations.created_at) = DATE(?)", name, time.Now()).Scan(&donation)
+func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (Donation, error) {
+	donation := Donation{}
+	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("recipient_id = (SELECT id FROM users WHERE name = ?) AND DATE(donations.created_at) = DATE(?)", name, time.Now()).First(&donation)
 
 	if tx.Error != nil {
 		return donation, tx.Error

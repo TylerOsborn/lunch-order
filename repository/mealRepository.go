@@ -1,11 +1,8 @@
 package repository
 
 import (
-	"lunchorder/models"
-
 	"gorm.io/gorm"
 )
-
 
 type MealRepository struct {
 	db *gorm.DB
@@ -23,8 +20,8 @@ func NewMealRepository(db *gorm.DB) *MealRepository {
 	return mealRepository
 }
 
-func (r *MealRepository) CreateMeal(meal *models.Meal) error {
-	var existingMeal models.Meal
+func (r *MealRepository) CreateMeal(meal *Meal) error {
+	var existingMeal Meal
 	result := r.db.First(&existingMeal, "description = ? AND date = ?", meal.Description, meal.Date)
 
 	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
@@ -40,11 +37,11 @@ func (r *MealRepository) CreateMeal(meal *models.Meal) error {
 	return result.Error
 }
 
-func (r *MealRepository) GetMealsByDate(date string) ([]models.Meal, error) {
-	var meals []models.Meal
+func (r *MealRepository) GetMealsByDate(date string) ([]Meal, error) {
+	var meals []Meal
 
 	result := r.db.Find(&meals, "date = ?", date)
-	
+
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -52,12 +49,12 @@ func (r *MealRepository) GetMealsByDate(date string) ([]models.Meal, error) {
 	return meals, nil
 }
 
-func (r *MealRepository) GetMealsByDates(startDate string, endDate string) ([]models.Meal, error) {
+func (r *MealRepository) GetMealsByDates(startDate string, endDate string) ([]Meal, error) {
 
-	var meals []models.Meal
+	var meals []Meal
 
 	result := r.db.Where("date >= ? AND date <= ?", startDate, endDate).Find(&meals)
-	
+
 	if result.Error != nil {
 		return nil, result.Error
 	}

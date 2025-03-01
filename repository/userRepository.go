@@ -1,19 +1,14 @@
 package repository
 
 import (
-	"lunchorder/models"
-
 	"gorm.io/gorm"
 )
-
 
 type UserRepository struct {
 	db *gorm.DB
 }
 
-
 var userRepo *UserRepository
-
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	if userRepo == nil {
@@ -25,15 +20,14 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return userRepo
 }
 
-func (r *UserRepository) CreateUser(user *models.User) error {
+func (r *UserRepository) CreateUser(user *User) error {
 	result := r.db.Create(user)
 
 	return result.Error
 }
 
-
-func (r *UserRepository) GetUserByName(name string) (*models.User, error) {
-	var user models.User
+func (r *UserRepository) GetUserByName(name string) (*User, error) {
+	var user User
 
 	result := r.db.First(&user, "name = ?", name)
 

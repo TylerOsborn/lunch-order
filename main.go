@@ -2,19 +2,23 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"github.com/joho/godotenv"
+	"log"
 	"lunchorder/constants"
 	"lunchorder/models"
 	"lunchorder/repository"
 	"lunchorder/service"
 	"lunchorder/utils"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -29,9 +33,12 @@ var mealService *service.MealService
 
 func main() {
 	var err error
-	db, err = gorm.Open(sqlite.Open("./database/database.db"), &gorm.Config{})
+
+	err = loadEnvironmentVariables(err)
+
+	err = getDBConfig()
 	if err != nil {
-		panic(err)
+		return
 	}
 	initDB(db)
 
@@ -55,6 +62,35 @@ func main() {
 	}
 }
 
+func loadEnvironmentVariables(err error) error {
+	err = godotenv.Load()
+	if err != nil {
+		log.Println("Error loading .env file, reading from environment")
+	}
+	return err
+}
+
+func getDBConfig() error {
+	var err error
+
+	user, foundUser := os.LookupEnv("MYSQL_USER")
+	password, foundPassword := os.LookupEnv("MYSQL_PASSWORD")
+	host, foundHost := os.LookupEnv("MYSQL_HOST")
+	port, foundPort := os.LookupEnv("MYSQL_PORT")
+	database, foundDatabase := os.LookupEnv("MYSQL_DATABASE")
+
+	if !foundUser || !foundPassword || !foundHost || !foundPort || !foundDatabase {
+		panic("Missing required environment variables")
+	}
+
+	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", user, password, host, port, database)
+	db, err = gorm.Open(mysql.Open(finalString), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+	return err
+}
+
 func setupCors(r *gin.Engine) {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
@@ -66,17 +102,17 @@ func setupCors(r *gin.Engine) {
 }
 
 func initDB(db *gorm.DB) {
-	err := db.Migrator().AutoMigrate(&models.Meal{})
+	err := db.Migrator().AutoMigrate(&repository.Meal{})
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.Migrator().AutoMigrate(&models.User{})
+	err = db.Migrator().AutoMigrate(&repository.User{})
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.Migrator().AutoMigrate(&models.Donation{})
+	err = db.Migrator().AutoMigrate(&repository.Donation{})
 	if err != nil {
 		panic(err)
 	}
@@ -134,7 +170,7 @@ func HandleGetDonationSummary(context *gin.Context) {
 }
 
 func HandleDonationClaim(context *gin.Context) {
-	var donationClaim models.APIRecipient
+	var donationClaim models.RecipientRequest
 	err := context.BindJSON(&donationClaim)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
@@ -196,7 +232,7 @@ func HandleGetDonationClaim(context *gin.Context) {
 }
 
 func HandleGetUnclaimedDonations(context *gin.Context) {
-	var donations []models.UnclaimedDonation
+	var donations []models.UnclaimedDonationResponse
 
 	today := time.Now().Format(constants.DATE_FORMAT)
 
@@ -218,7 +254,7 @@ func HandleGetUnclaimedDonations(context *gin.Context) {
 }
 
 func HandleDonateMeal(context *gin.Context) {
-	var donationRequest models.APIDonation
+	var donationRequest models.DonationRequest
 	err := context.BindJSON(&donationRequest)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{
@@ -244,7 +280,7 @@ func HandleDonateMeal(context *gin.Context) {
 }
 
 func HandleGetMealsToday(context *gin.Context) {
-	var meals []models.Meal
+	var meals []models.MealResponse
 	today := time.Now().Format(constants.DATE_FORMAT)
 
 	meals, err := mealService.GetMealsByDate(today)
@@ -264,7 +300,7 @@ func HandleGetMealsToday(context *gin.Context) {
 }
 
 func HandleMealUpload(context *gin.Context) {
-	var mealUpload models.MealUpload
+	var mealUpload models.MealUploadRequest
 	err := context.BindJSON(&mealUpload)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, models.ApiResult{

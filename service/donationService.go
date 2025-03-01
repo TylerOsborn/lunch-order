@@ -33,8 +33,8 @@ func NewDonationService(
 	return donationService
 }
 
-func (service *DonationService) CreateDonation(donationRequest *models.APIDonation) error {
-	var donation models.Donation
+func (service *DonationService) CreateDonation(donationRequest *models.DonationRequest) error {
+	var donation repository.Donation
 
 	donor, err := service.userRepository.GetUserByName(donationRequest.DonorName)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -42,7 +42,7 @@ func (service *DonationService) CreateDonation(donationRequest *models.APIDonati
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		donor = &models.User{Name: donationRequest.DonorName}
+		donor = &repository.User{Name: donationRequest.DonorName}
 		err = service.userRepository.CreateUser(donor)
 	}
 
@@ -58,7 +58,7 @@ func (service *DonationService) CreateDonation(donationRequest *models.APIDonati
 	return err
 }
 
-func (service *DonationService) ClaimDonation(donationClaim *models.APIRecipient) error {
+func (service *DonationService) ClaimDonation(donationClaim *models.RecipientRequest) error {
 	user, err := service.userRepository.GetUserByName(donationClaim.Name)
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -66,7 +66,7 @@ func (service *DonationService) ClaimDonation(donationClaim *models.APIRecipient
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		user = &models.User{Name: donationClaim.Name}
+		user = &repository.User{Name: donationClaim.Name}
 		err = service.userRepository.CreateUser(user)
 	}
 
@@ -86,28 +86,59 @@ func (service *DonationService) ClaimDonation(donationClaim *models.APIRecipient
 	return nil
 }
 
-func (service *DonationService) GetUnclaimedDonationsByDate(today string) ([]models.UnclaimedDonation, error) {
-	return service.donationRepository.GetUnclaimedDonationsByDate(today)
+func (service *DonationService) GetUnclaimedDonationsByDate(today string) ([]models.UnclaimedDonationResponse, error) {
+	var results []models.UnclaimedDonationResponse
+
+	unclaimedDonations, err := service.donationRepository.GetUnclaimedDonationsByDate(today)
+
+	for _, donation := range unclaimedDonations {
+		results = append(results, models.UnclaimedDonationResponse{
+			ID:          donation.ID,
+			Description: donation.Meal.Description,
+			DonorName:   donation.Donor.Name,
+		})
+	}
+
+	return results, err
 }
 
-func (service *DonationService) GetDonationsSummaryByDate(date string) ([]models.DonationClaimSummary, error) {
-	var donationClaimSummaries []models.DonationClaimSummary
+func (service *DonationService) GetDonationsSummaryByDate(date string) ([]models.DonationClaimSummaryResponse, error) {
+	var donationClaimSummaries []models.DonationClaimSummaryResponse
 
-	err := service.donationRepository.GetDonationsSummaryByDate(date, &donationClaimSummaries)
+	donations, err := service.donationRepository.GetDonationsSummaryByDate(date)
 
 	if err != nil {
 		return nil, err
 	}
 
+	for _, donation := range *donations {
+		donationClaimSummaries = append(donationClaimSummaries, models.DonationClaimSummaryResponse{
+			Claimed:       donation.Recipient.ID != 0,
+			Description:   donation.Meal.Description,
+			DonorName:     donation.Donor.Name,
+			RecipientName: donation.Recipient.Name,
+		})
+	}
+
 	return donationClaimSummaries, nil
 }
 
-func (service *DonationService) GetDonationClaimByClaimantName(name string) (models.ClaimedDonation, error) {
+func (service *DonationService) GetDonationClaimByClaimantName(name string) (models.ClaimedDonationResponse, error) {
 	donation, err := service.donationRepository.GetDonationClaimByClaimantName(name)
 
-	if err != nil {
-		return models.ClaimedDonation{}, err
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.ClaimedDonationResponse{}, err
 	}
 
-	return donation, nil
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.ClaimedDonationResponse{}, nil
+	}
+
+	return models.ClaimedDonationResponse{
+		UnclaimedDonationResponse: models.UnclaimedDonationResponse{
+			ID:          donation.ID,
+			DonorName:   donation.Donor.Name,
+			Description: donation.Meal.Description,
+		},
+	}, nil
 }
