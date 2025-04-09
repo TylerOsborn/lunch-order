@@ -48,7 +48,7 @@
       </div>
     </div>
     <Dialog :visible="requestSuccessDialogVisible" header="Request Submitted!" modal>
-      <p>Your meal donation request has been submitted. Check back on the "Recieve Meal" page to se if a meal has been received.</p>
+      <p>Your meal donation request has been submitted. Check back on the "Receive Meal" page to see if a meal has been received.</p>
       <template #footer>
         <Button label="Okay" @click="handleRequestOkayButton" />
       </template>
