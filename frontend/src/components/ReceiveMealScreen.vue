@@ -1,19 +1,28 @@
 <template>
   <div>
     <h2>Receive a Meal</h2>
-    <div v-if="!isChosenMealsError && !isChosenMealsPending && chosenMealsData">
+    <div v-if="isChosenMealsPending || isRequestSubmittedPending || isMealsPending">
+      <p>Loading data...</p>
+    </div>
+    <div v-else-if="!isChosenMealsError && chosenMealsData">
       <p>You have selected "{{chosenMealsData.description}}" from {{chosenMealsData.donorName}}</p>
     </div>
-    <div v-else-if="isMealsPending">
-      <p>Loading available meals...</p>
+    <div v-else-if="!isRequestSubmittedError && requestSubmittedData && requestSubmittedData.length > 0">
+      <p>No meals have been donated yet that match your preferences. Try coming back later!</p>
     </div>
     <div v-else-if="isMealsError">
       <p>Error loading meals. Please try again later.</p>
     </div>
     <div v-else-if="mealsData && mealsData.length === 0">
       <p>There are no meals available at the moment.</p>
+      <Button
+          class="full-width"
+          @click="navigateToDonationRequest"
+      >
+        Request a Meal Donation
+      </Button>
     </div>
-    <div v-else class="flex">
+    <div v-else-if="mealsData && mealsData.length > 0" class="flex">
       <div class="flex-left full-width">
         <InputText
             id="name"
@@ -51,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import Listbox from 'primevue/listbox';
@@ -81,15 +90,32 @@ const {isPending: isChosenMealsPending, data: chosenMealsData, isError: isChosen
       const result: ApiResult<Donation> = response.data;
       return result.data;
     } catch (error: any) {
-
       if (error.response.status == 404) {
         return null;
       }
-
       throw error;
     }
   },
-  refetchOnWindowFocus: false,
+  refetchOnWindowFocus: true,
+});
+
+const {isPending: isRequestSubmittedPending, data: requestSubmittedData, isError: isRequestSubmittedError} = useQuery({
+  queryKey: ['requestSubmitted'],
+  queryFn: async (): Promise<Donation | null> => {
+    try {
+      const encodedName = encodeURIComponent(name.value);
+      const response = await api.get(`/Api/DonationRequest/User?name=${encodedName}&date=${new Date().toISOString().split('T')[0]}`);
+      console.log(response.data);
+      const result: ApiResult<Donation[]> = response.data;
+      return result.data;
+    } catch (error: any) {
+      if (error.response.status == 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
+  refetchOnWindowFocus: true,
 });
 
 const {isPending: isMealsPending, data: mealsData, isError: isMealsError} = useQuery({
@@ -168,10 +194,9 @@ const handleOkayButton = () => {
   router.push('/');
 };
 
-// Lifecycle hooks
-onMounted(() => {
-  // Initial name is already set in ref initialization
-});
+const navigateToDonationRequest = () => {
+  router.push('/donation-request');
+};
 </script>
 
 <style scoped>
