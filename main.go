@@ -27,11 +27,9 @@ var db *gorm.DB
 var donationRepository *repository.DonationRepository
 var mealRepository *repository.MealRepository
 var userRepository *repository.UserRepository
-var donationRequestRepository *repository.DonationRequestRepository
 
 var donationService *service.DonationService
 var mealService *service.MealService
-var donationRequestService *service.DonationRequestService
 
 func main() {
 	var err error
@@ -47,11 +45,9 @@ func main() {
 	mealRepository = repository.NewMealRepository(db)
 	userRepository = repository.NewUserRepository(db)
 	donationRepository = repository.NewDonationRepository(db, userRepository)
-	donationRequestRepository = repository.NewDonationRequestRepository(db, userRepository, donationRepository)
 
 	donationService = service.NewDonationService(donationRepository, mealRepository, userRepository)
 	mealService = service.NewMealService(mealRepository)
-	donationRequestService = service.NewDonationRequestService(donationRequestRepository, donationRepository, userRepository)
 
 	// Route setup
 	r := gin.Default()
@@ -120,16 +116,6 @@ func initDB(db *gorm.DB) {
 	if err != nil {
 		panic(err)
 	}
-
-	err = db.Migrator().AutoMigrate(&repository.DonationRequest{})
-	if err != nil {
-		panic(err)
-	}
-
-	err = db.Migrator().AutoMigrate(&repository.DonationRequestMeal{})
-	if err != nil {
-		panic(err)
-	}
 }
 
 func setupFrontEnd(r *gin.Engine) {
@@ -158,11 +144,6 @@ func setupRoutes(r *gin.Engine) {
 	r.GET("/Api/Donation/Claim", HandleGetDonationClaim)
 
 	r.GET("/Api/Stats/Claims/Summary", HandleGetDonationSummary)
-
-	// Donation request routes
-	r.POST("/Api/DonationRequest", HandleCreateDonationRequest)
-	r.GET("/Api/DonationRequest", HandleGetPendingDonationRequests)
-	r.GET("/Api/DonationRequest/User", HandleGetUserDonationRequests)
 }
 
 func HandleGetDonationSummary(context *gin.Context) {
@@ -293,10 +274,6 @@ func HandleDonateMeal(context *gin.Context) {
 		return
 	}
 
-	if donationRequestService != nil {
-		_ = donationRequestService.CheckAndFulfillDonationRequests()
-	}
-
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 	})
@@ -381,93 +358,5 @@ func HandleGetMeals(context *gin.Context) {
 		StatusCode: http.StatusOK,
 		Data:       meals,
 	})
-}
 
-// HandleCreateDonationRequest creates a new donation request
-func HandleCreateDonationRequest(context *gin.Context) {
-	var donationRequestData models.DonationRequestCreate
-	err := context.BindJSON(&donationRequestData)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	// Validate request data
-	if donationRequestData.RequesterName == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "requesterName is required",
-		})
-		return
-	}
-
-	if len(donationRequestData.MealIds) == 0 {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "at least one meal must be selected",
-		})
-		return
-	}
-
-	err = donationRequestService.CreateDonationRequest(&donationRequestData)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	// After creating the request, check if any requests can be fulfilled with available donations
-	donationRequestService.CheckAndFulfillDonationRequests()
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-	})
-}
-
-func HandleGetPendingDonationRequests(context *gin.Context) {
-	requests, err := donationRequestService.GetDonationRequestsByStatus("pending")
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       requests,
-	})
-}
-
-func HandleGetUserDonationRequests(context *gin.Context) {
-	userName := context.Query("name")
-	if userName == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "name is a required query parameter",
-		})
-		return
-	}
-
-	date := context.Query("date")
-
-	requests, err := donationRequestService.GetDonationRequestsByRequesterName(userName, date)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       requests,
-	})
 }

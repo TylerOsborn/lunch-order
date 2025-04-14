@@ -22,18 +22,3 @@ type Donation struct {
 	RecipientID *uint `json:"recipientId"`
 	Recipient   User  `json:"recipient" gorm:"foreignKey:RecipientID"`
 }
-
-type DonationRequest struct {
-	gorm.Model
-	RequesterID uint     `json:"requesterId"`
-	Requester   User     `json:"requester" gorm:"foreignKey:RequesterID"`
-	Status      string   `json:"status"` // "pending", "fulfilled", "cancelled"
-	DonationID  *uint    `json:"donationId"`
-	Donation    Donation `json:"donation" gorm:"foreignKey:DonationID"`
-}
-
-type DonationRequestMeal struct {
-	DonationRequestID uint `gorm:"primaryKey"`
-	MealID            uint `gorm:"primaryKey"`
-	Meal              Meal
-}

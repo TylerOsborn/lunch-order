@@ -10,13 +10,11 @@ import HomeScreen from './components/HomeScreen.vue';
 import GiveMealScreen from './components/GiveMealScreen.vue';
 import ReceiveMealScreen from './components/ReceiveMealScreen.vue';
 import AdminScreen from './components/AdminScreen.vue';
-import DonationRequestScreen from './components/DonationRequestScreen.vue';
 
 const routes = [
   { path: '/', component: HomeScreen },
   { path: '/give-meal', component: GiveMealScreen },
   { path: '/receive-meal', component: ReceiveMealScreen },
-  { path: '/donation-request', component: DonationRequestScreen },
   { path: '/admin', component: AdminScreen },
 ];
 
