@@ -60,17 +60,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
+import {ref} from 'vue';
+import {useRouter} from 'vue-router';
+import {useMutation, useQuery, useQueryClient} from '@tanstack/vue-query';
 import Listbox from 'primevue/listbox';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
-import { useToast } from 'primevue/usetoast';
+import {useToast} from 'primevue/usetoast';
 import api from '../axios/axios';
-import { getNameFromCookie, setNameCookie } from '../utils/utils';
-import type { ApiResult, Donation } from '../models/models';
+import {getNameFromCookie, setNameCookie} from '../utils/utils';
+import type {ApiResult, Donation} from '../models/models';
 
 const router = useRouter();
 const toast = useToast();
@@ -101,13 +101,12 @@ const {isPending: isChosenMealsPending, data: chosenMealsData, isError: isChosen
 
 const {isPending: isRequestSubmittedPending, data: requestSubmittedData, isError: isRequestSubmittedError} = useQuery({
   queryKey: ['requestSubmitted'],
-  queryFn: async (): Promise<Donation | null> => {
+  queryFn: async (): Promise<Donation[] | null> => {
     try {
       const encodedName = encodeURIComponent(name.value);
       const response = await api.get(`/Api/DonationRequest/User?name=${encodedName}&date=${new Date().toISOString().split('T')[0]}`);
-      console.log(response.data);
       const result: ApiResult<Donation[]> = response.data;
-      return result.data;
+      return result.data || [];
     } catch (error: any) {
       if (error.response.status == 404) {
         return null;
