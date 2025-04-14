@@ -42,15 +42,3 @@ type DonationClaimSummaryResponse struct {
 type MealUploadRequest struct {
 	Csv string `json:"csv"`
 }
-
-type DonationRequestCreate struct {
-	RequesterName string `json:"requesterName"`
-	MealIds       []uint `json:"mealIds"`
-}
-
-type DonationRequestResponse struct {
-	ID            uint   `json:"id"`
-	RequesterName string `json:"requesterName"`
-	Description   string `json:"description"`
-	Status        string `json:"status"`
-}

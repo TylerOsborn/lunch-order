@@ -22,16 +22,3 @@ export interface DonationClaimSummary {
   donorName: string;
   recipientName: string;
 }
-
-export interface DonationRequest {
-  id: number;
-  requesterName: string;
-  mealIds: number[];
-  status: 'pending' | 'fulfilled' | 'cancelled';
-}
-
-export interface MealPreference {
-  id: number;
-  description: string;
-  selected: boolean;
-}
