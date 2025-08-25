@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import api from '../axios/axios.ts';
 import { ApiResult, DonationClaimSummary, Meal } from '../models/models.ts';
 import { getTodayDate, mondayDate, thursdayDate } from '../utils/utils.ts';
+import { useAuth } from '../composables/useAuth.ts';
 
 import Card from 'primevue/card';
 import DataTable from 'primevue/datatable';
@@ -12,9 +13,11 @@ import Textarea from 'primevue/textarea';
 import Button from 'primevue/button';
 import Divider from 'primevue/divider';
 import { useToast } from 'primevue/usetoast';
+import AdminLogin from './AdminLogin.vue';
 
 const toast = useToast();
 const queryClient = useQueryClient();
+const { isAuthenticated, logout } = useAuth();
 
 const newMeals = ref('');
 
@@ -68,10 +71,39 @@ const { mutate: submitMeal } = useMutation({
 const handleSubmitMeal = () => {
   submitMeal();
 };
+
+const handleLogin = () => {
+  // Refresh queries after login
+  queryClient.invalidateQueries({ queryKey: ['meals'] });
+  queryClient.invalidateQueries({ queryKey: ['claimsSummary'] });
+};
+
+const handleLogout = () => {
+  logout();
+  toast.add({ 
+    severity: 'info', 
+    summary: 'Logged out', 
+    detail: 'You have been logged out successfully',
+    life: 3000 
+  });
+};
 </script>
 
 <template>
-  <div class="container">
+  <div v-if="!isAuthenticated">
+    <AdminLogin @login="handleLogin" />
+  </div>
+  <div v-else class="container">
+    <div class="admin-header">
+      <h1>Admin Dashboard</h1>
+      <Button 
+        label="Logout" 
+        icon="pi pi-sign-out" 
+        severity="secondary" 
+        @click="handleLogout" 
+        class="logout-button"
+      />
+    </div>
     <Card class="card">
       <template #title>
         <h2>Daily Summary</h2>
@@ -108,25 +140,47 @@ const handleSubmitMeal = () => {
 </template>
 
 <style>
+  .admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+  }
+
+  .admin-header h1 {
+    margin: 0;
+  }
+
+  .logout-button {
+    margin-left: auto;
+  }
+
   .container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 1rem;
-    justify-content: center;
-    align-items: center;
+    padding: 2rem;
+  }
 
-    height: calc(100vh - 4rem);
-    width: calc(100vw - 4rem);
+  .container .card {
+    height: 100%;
+    width: 50%;
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-start;
+      height: calc(100vh - 4rem);
+      width: calc(100vw - 4rem);
+    }
   }
 
   .sub-button {
     margin: 10px;
     width: 100%;
-  }
-
-  .card {
-    height: 100%;
-    width: 50%;
   }
 
   #app {
