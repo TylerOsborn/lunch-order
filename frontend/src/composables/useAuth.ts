@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
+import api from '../axios/axios';
 
-const ADMIN_PASSWORD = 'admin123'; // Simple password for basic auth
 const AUTH_STORAGE_KEY = 'lunch-order-admin-auth';
 
 // Global state for authentication
@@ -18,13 +18,21 @@ const initializeAuth = () => {
 initializeAuth();
 
 export const useAuth = () => {
-  const login = (password: string): boolean => {
-    if (password === ADMIN_PASSWORD) {
-      isAuthenticated.value = true;
-      localStorage.setItem(AUTH_STORAGE_KEY, 'authenticated');
-      return true;
+  const login = async (password: string): Promise<boolean> => {
+    try {
+      const response = await api.post('/Api/Admin/Login', { password });
+
+      if (response.status === 200 && response.data?.data?.authenticated) {
+        isAuthenticated.value = true;
+        localStorage.setItem(AUTH_STORAGE_KEY, 'authenticated');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Authentication error:', error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

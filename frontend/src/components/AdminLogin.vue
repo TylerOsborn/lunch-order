@@ -30,7 +30,7 @@ const handleLogin = async () => {
 
   isLoading.value = true;
   
-  const success = login(password.value);
+  const success = await login(password.value);
   
   if (success) {
     toast.add({ 
