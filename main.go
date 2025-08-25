@@ -163,6 +163,9 @@ func setupRoutes(r *gin.Engine) {
 	r.POST("/Api/DonationRequest", HandleCreateDonationRequest)
 	r.GET("/Api/DonationRequest", HandleGetPendingDonationRequests)
 	r.GET("/Api/DonationRequest/User", HandleGetUserDonationRequests)
+
+	// Admin authentication route
+	r.POST("/Api/Admin/Login", HandleAdminLogin)
 }
 
 func HandleGetDonationSummary(context *gin.Context) {
@@ -470,4 +473,41 @@ func HandleGetUserDonationRequests(context *gin.Context) {
 		StatusCode: http.StatusOK,
 		Data:       requests,
 	})
+}
+
+// HandleAdminLogin handles admin authentication
+func HandleAdminLogin(context *gin.Context) {
+	var loginRequest struct {
+		Password string `json:"password" binding:"required"`
+	}
+	
+	err := context.BindJSON(&loginRequest)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, models.ApiResult{
+			StatusCode: http.StatusBadRequest,
+			Error:      "Invalid request format",
+		})
+		return
+	}
+
+	// Get admin password from environment variable
+	adminPassword, found := os.LookupEnv("ADMIN_PASSWORD")
+	if !found {
+		// Fallback to default password if environment variable is not set
+		adminPassword = "admin123"
+		log.Println("ADMIN_PASSWORD environment variable not set, using default password")
+	}
+
+	// Validate password
+	if loginRequest.Password == adminPassword {
+		context.JSON(http.StatusOK, models.ApiResult{
+			StatusCode: http.StatusOK,
+			Data:       map[string]bool{"authenticated": true},
+		})
+	} else {
+		context.JSON(http.StatusUnauthorized, models.ApiResult{
+			StatusCode: http.StatusUnauthorized,
+			Error:      "Invalid password",
+		})
+	}
 }

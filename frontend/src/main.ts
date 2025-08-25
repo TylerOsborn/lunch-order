@@ -17,12 +17,27 @@ const routes = [
   { path: '/give-meal', component: GiveMealScreen },
   { path: '/receive-meal', component: ReceiveMealScreen },
   { path: '/donation-request', component: DonationRequestScreen },
-  { path: '/admin', component: AdminScreen },
+  { 
+    path: '/admin', 
+    component: AdminScreen,
+    meta: { requiresAuth: true }
+  },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+// Add route guard for admin authentication
+router.beforeEach((to, _from, next) => {
+  if (to.meta.requiresAuth) {
+    // The admin screen will handle showing the login form
+    // So we always allow navigation to admin route
+    next();
+  } else {
+    next();
+  }
 });
 
 const app = createApp(App);
