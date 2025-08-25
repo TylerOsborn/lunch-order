@@ -6,6 +6,7 @@ import (
 	"github.com/joho/godotenv"
 	"log"
 	"lunchorder/constants"
+	"lunchorder/middleware"
 	"lunchorder/models"
 	"lunchorder/repository"
 	"lunchorder/service"
@@ -32,6 +33,9 @@ var donationRequestRepository *repository.DonationRequestRepository
 var donationService *service.DonationService
 var mealService *service.MealService
 var donationRequestService *service.DonationRequestService
+var authService *service.AuthService
+
+var authMiddleware *middleware.AuthMiddleware
 
 func main() {
 	var err error
@@ -52,6 +56,22 @@ func main() {
 	donationService = service.NewDonationService(donationRepository, mealRepository, userRepository)
 	mealService = service.NewMealService(mealRepository)
 	donationRequestService = service.NewDonationRequestService(donationRequestRepository, donationRepository, userRepository)
+	
+	// Initialize auth service
+	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+	googleRedirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
+	if googleRedirectURL == "" {
+		googleRedirectURL = "http://localhost:8080/Api/Auth/Callback"
+	}
+	authService = service.NewAuthService(userRepository, googleClientID, googleClientSecret, googleRedirectURL)
+	
+	// Initialize auth middleware
+	sessionSecret := os.Getenv("SESSION_SECRET")
+	if sessionSecret == "" {
+		sessionSecret = "your-session-secret-change-in-production"
+	}
+	authMiddleware = middleware.NewAuthMiddleware(sessionSecret, userRepository)
 
 	// Route setup
 	r := gin.Default()
@@ -146,23 +166,37 @@ func setupFrontEnd(r *gin.Engine) {
 }
 
 func setupRoutes(r *gin.Engine) {
+	// Auth routes (public)
+	r.GET("/Api/Auth/Login", HandleGoogleLogin)
+	r.GET("/Api/Auth/Callback", HandleGoogleCallback)
+	r.POST("/Api/Auth/Logout", HandleLogout)
+	r.GET("/Api/Auth/Profile", authMiddleware.RequireAuth(), HandleGetProfile)
+
+	// Public routes
 	r.GET("/Api/Meal", HandleGetMeals)
-
-	r.POST("/Api/Meal/Upload", HandleMealUpload)
 	r.GET("/Api/Meal/Today", HandleGetMealsToday)
-
-	r.POST("/Api/Donation", HandleDonateMeal)
 	r.GET("/Api/Donation", HandleGetUnclaimedDonations)
-
-	r.POST("/Api/Donation/Claim", HandleDonationClaim)
-	r.GET("/Api/Donation/Claim", HandleGetDonationClaim)
-
-	r.GET("/Api/Stats/Claims/Summary", HandleGetDonationSummary)
-
-	// Donation request routes
-	r.POST("/Api/DonationRequest", HandleCreateDonationRequest)
 	r.GET("/Api/DonationRequest", HandleGetPendingDonationRequests)
-	r.GET("/Api/DonationRequest/User", HandleGetUserDonationRequests)
+
+	// Protected routes (require authentication)
+	authenticated := r.Group("/Api")
+	authenticated.Use(authMiddleware.RequireAuth())
+	{
+		authenticated.POST("/Donation", HandleDonateMeal)
+		authenticated.POST("/Donation/Claim", HandleDonationClaim)
+		authenticated.GET("/Donation/Claim", HandleGetDonationClaim)
+		authenticated.POST("/DonationRequest", HandleCreateDonationRequest)
+		authenticated.GET("/DonationRequest/User", HandleGetUserDonationRequests)
+	}
+
+	// Admin-only routes
+	admin := r.Group("/Api")
+	admin.Use(authMiddleware.RequireAuth())
+	admin.Use(authMiddleware.RequireAdmin())
+	{
+		admin.POST("/Meal/Upload", HandleMealUpload)
+		admin.GET("/Stats/Claims/Summary", HandleGetDonationSummary)
+	}
 }
 
 func HandleGetDonationSummary(context *gin.Context) {
@@ -469,5 +503,62 @@ func HandleGetUserDonationRequests(context *gin.Context) {
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 		Data:       requests,
+	})
+}
+// Auth handlers
+func HandleGoogleLogin(context *gin.Context) {
+	state := "random-state-string" // In production, use a proper random state
+	authURL := authService.GetAuthURL(state)
+	context.JSON(http.StatusOK, gin.H{"auth_url": authURL})
+}
+
+func HandleGoogleCallback(context *gin.Context) {
+	code := context.Query("code")
+	if code == "" {
+		context.JSON(http.StatusBadRequest, gin.H{"error": "Code not provided"})
+		return
+	}
+
+	user, err := authService.HandleCallback(code)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = authMiddleware.SetUserSession(context, user)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set session"})
+		return
+	}
+
+	// Redirect to frontend
+	context.Redirect(http.StatusFound, "http://localhost:5173/")
+}
+
+func HandleLogout(context *gin.Context) {
+	err := authMiddleware.ClearUserSession(context)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear session"})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+func HandleGetProfile(context *gin.Context) {
+	user, exists := context.Get("user")
+	if !exists {
+		context.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	userData := user.(*repository.User)
+	context.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id":    userData.ID,
+			"name":  userData.Name,
+			"email": userData.Email,
+			"role":  userData.Role,
+		},
 	})
 }
