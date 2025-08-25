@@ -37,3 +37,31 @@ func (r *UserRepository) GetUserByName(name string) (*User, error) {
 
 	return &user, nil
 }
+
+func (r *UserRepository) GetUserByEmail(email string) (*User, error) {
+	var user User
+
+	result := r.db.First(&user, "email = ?", email)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) GetUserByGoogleID(googleID string) (*User, error) {
+	var user User
+
+	result := r.db.First(&user, "google_id = ?", googleID)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) GetDB() *gorm.DB {
+	return r.db
+}
