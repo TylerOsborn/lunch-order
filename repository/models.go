@@ -15,9 +15,9 @@ type User struct {
 
 type Donation struct {
 	gorm.Model
-	MealID      uint  `json:"mealId"`
+	MealID      uint  `json:"mealId" gorm:"uniqueIndex:idx_meal_donor"`
 	Meal        Meal  `json:"meal" gorm:"foreignKey:MealID"`
-	DonorID     uint  `json:"donorId"`
+	DonorID     uint  `json:"donorId" gorm:"uniqueIndex:idx_meal_donor"`
 	Donor       User  `json:"donor" gorm:"foreignKey:DonorID"`
 	RecipientID *uint `json:"recipientId"`
 	Recipient   User  `json:"recipient" gorm:"foreignKey:RecipientID"`

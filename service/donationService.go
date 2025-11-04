@@ -142,3 +142,23 @@ func (service *DonationService) GetDonationClaimByClaimantName(name string) (mod
 		},
 	}, nil
 }
+
+func (service *DonationService) GetDonationByDonorName(name string) (models.ClaimedDonationResponse, error) {
+	donation, err := service.donationRepository.GetDonationByDonorName(name)
+
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.ClaimedDonationResponse{}, err
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.ClaimedDonationResponse{}, nil
+	}
+
+	return models.ClaimedDonationResponse{
+		UnclaimedDonationResponse: models.UnclaimedDonationResponse{
+			ID:          donation.ID,
+			DonorName:   donation.Donor.Name,
+			Description: donation.Meal.Description,
+		},
+	}, nil
+}

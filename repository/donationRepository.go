@@ -71,3 +71,14 @@ func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (Donati
 
 	return donation, nil
 }
+
+func (r *DonationRepository) GetDonationByDonorName(name string) (Donation, error) {
+	donation := Donation{}
+	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("donor_id = (SELECT id FROM users WHERE name = ?) AND DATE(donations.created_at) = DATE(?)", name, time.Now()).First(&donation)
+
+	if tx.Error != nil {
+		return donation, tx.Error
+	}
+
+	return donation, nil
+}

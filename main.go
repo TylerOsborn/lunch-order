@@ -153,6 +153,7 @@ func setupRoutes(r *gin.Engine) {
 
 	r.POST("/Api/Donation", HandleDonateMeal)
 	r.GET("/Api/Donation", HandleGetUnclaimedDonations)
+	r.GET("/Api/Donation/Donor", HandleGetDonationByDonor)
 
 	r.POST("/Api/Donation/Claim", HandleDonationClaim)
 	r.GET("/Api/Donation/Claim", HandleGetDonationClaim)
@@ -247,6 +248,42 @@ func HandleGetDonationClaim(context *gin.Context) {
 	context.JSON(http.StatusOK, models.ApiResult{
 		StatusCode: http.StatusOK,
 		Data:       claimed,
+	})
+}
+
+func HandleGetDonationByDonor(context *gin.Context) {
+	var donorName string
+	donorName = context.Query("name")
+
+	if donorName == "" {
+		context.JSON(http.StatusBadRequest, models.ApiResult{
+			StatusCode: http.StatusBadRequest,
+			Error:      "name is a required query parameter",
+		})
+		return
+	}
+
+	donation, err := donationService.GetDonationByDonorName(donorName)
+
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, models.ApiResult{
+			StatusCode: http.StatusInternalServerError,
+			Error:      err.Error(),
+		})
+		return
+	}
+
+	if donation.ID <= 0 {
+		context.JSON(http.StatusNotFound, models.ApiResult{
+			StatusCode: http.StatusNotFound,
+			Error:      "No donations found",
+		})
+		return
+	}
+
+	context.JSON(http.StatusOK, models.ApiResult{
+		StatusCode: http.StatusOK,
+		Data:       donation,
 	})
 }
 
