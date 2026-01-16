@@ -33,7 +33,7 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-    next('/401');
+    next('/login');
   } else if (to.path === '/login' && userStore.isAuthenticated) {
     next('/');
   } else if (to.meta.requiresAdmin && !userStore.user?.isAdmin) {
