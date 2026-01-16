@@ -2,7 +2,6 @@ SELECT
     d.id, 
     d.created_at, 
     d.updated_at, 
-    d.deleted_at, 
     d.meal_id, 
     d.donor_id, 
     d.recipient_id,
@@ -17,5 +16,4 @@ FROM donations d
 JOIN meals m ON d.meal_id = m.id
 JOIN users donor ON d.donor_id = donor.id
 LEFT JOIN users recipient ON d.recipient_id = recipient.id
-WHERE DATE(d.created_at) = DATE(?)
-AND d.deleted_at IS NULL;
+WHERE DATE(d.created_at) = DATE(?);

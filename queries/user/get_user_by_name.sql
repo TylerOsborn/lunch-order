@@ -1,3 +1,3 @@
 SELECT * FROM users 
-WHERE name = ? AND deleted_at IS NULL 
+WHERE name = ? 
 LIMIT 1;

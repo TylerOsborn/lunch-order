@@ -1,3 +1,3 @@
 SELECT * FROM meals 
-WHERE description = ? AND date = ? AND deleted_at IS NULL 
+WHERE description = ? AND date = ? 
 LIMIT 1;

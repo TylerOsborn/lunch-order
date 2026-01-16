@@ -2,7 +2,6 @@ SELECT
     dr.id, 
     dr.created_at, 
     dr.updated_at, 
-    dr.deleted_at, 
     dr.requester_id, 
     dr.status, 
     dr.donation_id,
@@ -24,5 +23,4 @@ LEFT JOIN meals m ON d.meal_id = m.id
 WHERE dr.requester_id = ? 
 AND dr.status = 'pending' 
 AND DATE(dr.created_at) = DATE(?)
-AND dr.deleted_at IS NULL
 ORDER BY dr.created_at DESC;

@@ -1,11 +1,10 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
 	"log"
 	"lunchorder/handlers"
-	"lunchorder/queries"
 	"lunchorder/repository"
 	"lunchorder/router"
 	"lunchorder/service"
@@ -13,9 +12,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 func main() {
 	var err error
@@ -76,7 +81,7 @@ func getDBConfig() (*sqlx.DB, error) {
 		return nil, fmt.Errorf("missing required environment variables")
 	}
 
-	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", user, password, host, port, database)
+	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, password, host, port, database)
 	db, err := sqlx.Connect("mysql", finalString)
 	if err != nil {
 		return nil, err
@@ -85,8 +90,23 @@ func getDBConfig() (*sqlx.DB, error) {
 }
 
 func initDB(db *sqlx.DB) {
-	_, err := db.Exec(queries.Schema)
+	driver, err := mysql.WithInstance(db.DB, &mysql.Config{})
 	if err != nil {
-		log.Fatal("Failed to execute schema migration: ", err)
+		log.Fatal("Failed to create migration driver: ", err)
 	}
+
+	d, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		log.Fatal("Failed to create migration source: ", err)
+	}
+
+	m, err := migrate.NewWithInstance("iofs", d, "mysql", driver)
+	if err != nil {
+		log.Fatal("Failed to create migration instance: ", err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal("Failed to run migrations: ", err)
+	}
+	log.Println("Migrations ran successfully")
 }

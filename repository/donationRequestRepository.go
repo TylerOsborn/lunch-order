@@ -67,7 +67,7 @@ func (r *DonationRequestRepository) GetDonationRequestsByStatus(status string) (
 		var u User
 		
 		err := rows.Scan(
-			&dr.ID, &dr.CreatedAt, &dr.UpdatedAt, &dr.DeletedAt, &dr.RequesterID, &dr.Status, &dr.DonationID,
+			&dr.ID, &dr.CreatedAt, &dr.UpdatedAt, &dr.RequesterID, &dr.Status, &dr.DonationID,
 			&u.ID, &u.Name,
 		)
 		if err != nil {
@@ -115,7 +115,7 @@ func (r *DonationRequestRepository) GetDonationRequestsByRequesterName(requester
 		var mealDate *string
 
 		err := rows.Scan(
-			&dr.ID, &dr.CreatedAt, &dr.UpdatedAt, &dr.DeletedAt, &dr.RequesterID, &dr.Status, &dr.DonationID,
+			&dr.ID, &dr.CreatedAt, &dr.UpdatedAt, &dr.RequesterID, &dr.Status, &dr.DonationID,
 			&u.ID, &u.Name,
 			&donationID, &donationMealID, &donationDonorID,
 			&donorID, &donorName,

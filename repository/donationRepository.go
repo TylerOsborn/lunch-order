@@ -52,7 +52,7 @@ func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donatio
 		var u User
 		
 		err := rows.Scan(
-			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.MealID, &d.DonorID, &d.RecipientID,
+			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
 			&m.ID, &m.Description, &m.Date,
 			&u.ID, &u.Name,
 		)
@@ -86,7 +86,7 @@ func (r *DonationRepository) GetDonationsSummaryByDate(date string) (*[]Donation
 		var recipientName *string
 
 		err := rows.Scan(
-			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.MealID, &d.DonorID, &d.RecipientID,
+			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
 			&m.ID, &m.Description, &m.Date,
 			&donor.ID, &donor.Name,
 			&recipientID, &recipientName,
@@ -121,7 +121,7 @@ func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (Donati
 	row := r.db.QueryRowx(queries.GetDonationClaimByName, name, time.Now())
 	
 	err := row.Scan(
-		&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt, &d.MealID, &d.DonorID, &d.RecipientID,
+		&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
 		&m.ID, &m.Description, &m.Date,
 		&donor.ID, &donor.Name,
 	)

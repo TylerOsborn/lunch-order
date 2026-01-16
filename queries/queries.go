@@ -2,10 +2,6 @@ package queries
 
 import _ "embed"
 
-// Schema
-//go:embed schema.sql
-var Schema string
-
 // Meal
 //go:embed meal/create_meal.sql
 var CreateMeal string
