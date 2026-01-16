@@ -25,11 +25,20 @@ var GetUserByName string
 //go:embed user/upsert_user_google.sql
 var UpsertUserGoogle string
 
+//go:embed user/insert_user_google.sql
+var InsertUserGoogle string
+
+//go:embed user/update_user_google.sql
+var UpdateUserGoogle string
+
 //go:embed user/get_user_by_google_id.sql
 var GetUserByGoogleID string
 
 //go:embed user/get_user_by_id.sql
 var GetUserByID string
+
+//go:embed user/get_user_by_email.sql
+var GetUserByEmail string
 
 // Donation
 //go:embed donation/create_donation.sql

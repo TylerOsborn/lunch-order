@@ -16,6 +16,7 @@ import (
 	"lunchorder/router"
 	"lunchorder/service"
 	"os"
+	"time"
 )
 
 //go:embed migrations/*.sql
@@ -81,11 +82,21 @@ func getDBConfig() (*sqlx.DB, error) {
 		return nil, fmt.Errorf("missing required environment variables")
 	}
 
-	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, password, host, port, database)
+	// Add connection parameters for reliability and timeouts
+	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&timeout=10s&readTimeout=30s&writeTimeout=30s&charset=utf8mb4&collation=utf8mb4_unicode_ci",
+		user, password, host, port, database)
+
 	db, err := sqlx.Connect("mysql", finalString)
 	if err != nil {
 		return nil, err
 	}
+
+	// Configure connection pool to prevent connection exhaustion and timeouts
+	db.SetMaxOpenConns(25)                  // Maximum number of open connections to the database
+	db.SetMaxIdleConns(5)                   // Maximum number of idle connections in the pool
+	db.SetConnMaxLifetime(5 * time.Minute)  // Maximum lifetime of a connection (prevents stale connections)
+	db.SetConnMaxIdleTime(1 * time.Minute)  // Maximum time a connection can be idle
+
 	return db, nil
 }
 

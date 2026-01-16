@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"lunchorder/repository"
 	"net/http"
 	"os"
@@ -115,7 +116,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	}
 
 	if err := h.userRepo.UpsertUser(user); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save user"})
+		log.Printf("Error upserting user %s (email: %s, googleID: %s): %v", user.Name, *user.Email, *user.GoogleID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to save user: %v", err)})
 		return
 	}
 
