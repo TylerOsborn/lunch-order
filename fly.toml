@@ -8,10 +8,6 @@ primary_region = 'jnb'
 
 [build]
 
-[[mounts]]
-  source = 'database'
-  destination = '/root/database'
-
 [http_service]
   internal_port = 8080
   force_https = true

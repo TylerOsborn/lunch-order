@@ -1,54 +1,82 @@
 package repository
 
 import (
+	"errors"
+	"github.com/jmoiron/sqlx"
 	"log"
+	"lunchorder/queries"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 type DonationRepository struct {
-	db             *gorm.DB
+	db             *sqlx.DB
 	userRepository *UserRepository
 }
 
 var donationRepository *DonationRepository
 
-func NewDonationRepository(db *gorm.DB, userRepository *UserRepository) *DonationRepository {
-	if donationRepository == nil {
-		donationRepository = &DonationRepository{
-			db:             db,
-			userRepository: userRepository,
-		}
+func NewDonationRepository(db *sqlx.DB, userRepository *UserRepository) *DonationRepository {
+	return &DonationRepository{
+		db:             db,
+		userRepository: userRepository,
 	}
-
-	return donationRepository
 }
 
 func (r *DonationRepository) CreateDonation(donation *Donation) error {
-	result := r.db.Create(&donation)
+	result, err := r.db.Exec(queries.CreateDonation, donation.MealID, donation.DonorID, donation.DonorID)
+	if err != nil {
+		return err
+	}
 
-	return result.Error
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("user has already donated today")
+	}
+
+	return nil
 }
 
 func (r *DonationRepository) ClaimDonation(donationId uint, user *User) (bool, error) {
-
-	result := r.db.Exec("UPDATE donations SET recipient_id = ? WHERE id = ? AND (recipient_id = 0 OR recipient_id IS NULL)", user.ID, donationId)
-	if result.Error != nil {
-		log.Println("Failed to claim donation:", result.Error)
-		return false, result.Error
+	result, err := r.db.Exec(queries.ClaimDonation, user.ID, donationId)
+	if err != nil {
+		log.Println("Failed to claim donation:", err)
+		return false, err
 	}
 
-	return result.RowsAffected > 0, nil
+	rows, err := result.RowsAffected()
+	return rows > 0, err
 }
 
 func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donation, error) {
 	var unclaimedDonations []Donation
 
-	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("(recipient_id <= 0 OR recipient_id IS NULL) AND DATE(Meal.date) = DATE(?)", date).Find(&unclaimedDonations)
+	rows, err := r.db.Queryx(queries.GetUnclaimedDonations, date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	if tx.Error != nil {
-		return unclaimedDonations, tx.Error
+	for rows.Next() {
+		var d Donation
+		var m Meal
+		var u User
+
+		err := rows.Scan(
+			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
+			&m.ID, &m.Description, &m.Date,
+			&u.ID, &u.Name,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		d.Meal = m
+		d.Donor = u
+		unclaimedDonations = append(unclaimedDonations, d)
 	}
 
 	return unclaimedDonations, nil
@@ -56,18 +84,68 @@ func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donatio
 
 func (r *DonationRepository) GetDonationsSummaryByDate(date string) (*[]Donation, error) {
 	var donations []Donation
-	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("DATE(donations.created_at) = DATE(?)", date).Find(&donations)
 
-	return &donations, tx.Error
+	rows, err := r.db.Queryx(queries.GetDonationsSummary, date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var d Donation
+		var m Meal
+		var donor User
+		var recipient User
+		var recipientID *uint
+		var recipientName *string
+
+		err := rows.Scan(
+			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
+			&m.ID, &m.Description, &m.Date,
+			&donor.ID, &donor.Name,
+			&recipientID, &recipientName,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		d.Meal = m
+		d.Donor = donor
+
+		if recipientID != nil {
+			recipient.ID = *recipientID
+			if recipientName != nil {
+				recipient.Name = *recipientName
+			}
+			d.Recipient = recipient
+		}
+
+		donations = append(donations, d)
+	}
+
+	return &donations, nil
 }
 
 func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (Donation, error) {
-	donation := Donation{}
-	tx := r.db.Joins("Donor").Joins("Recipient").Joins("Meal").Where("recipient_id = (SELECT id FROM users WHERE name = ?) AND DATE(donations.created_at) = DATE(?)", name, time.Now()).First(&donation)
+	var d Donation
+	var m Meal
+	var donor User
 
-	if tx.Error != nil {
-		return donation, tx.Error
+	row := r.db.QueryRowx(queries.GetDonationClaimByName, name, time.Now())
+
+	err := row.Scan(
+		&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
+		&m.ID, &m.Description, &m.Date,
+		&donor.ID, &donor.Name,
+	)
+
+	if err != nil {
+		return d, err
 	}
 
-	return donation, nil
+	d.Meal = m
+	d.Donor = donor
+
+	return d, nil
 }

@@ -26,13 +26,9 @@ FROM ubuntu:22.04
 
 WORKDIR /root/
 
-RUN mkdir -p /root/database
-
 COPY --from=backend-builder /lunch-order/main .
 
 COPY --from=frontend-builder /lunch-order/frontend/dist ./frontend/dist
-
-VOLUME /root/database
 
 EXPOSE 8080:8080
 

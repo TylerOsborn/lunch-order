@@ -1,118 +1,164 @@
 package repository
 
 import (
-	"gorm.io/gorm"
+	"github.com/jmoiron/sqlx"
+	"lunchorder/queries"
 )
 
 type DonationRequestRepository struct {
-	db                 *gorm.DB
+	db                 *sqlx.DB
 	userRepository     *UserRepository
 	donationRepository *DonationRepository
 }
 
 var donationRequestRepository *DonationRequestRepository
 
-func NewDonationRequestRepository(db *gorm.DB, userRepository *UserRepository, donationRepository *DonationRepository) *DonationRequestRepository {
-	if donationRequestRepository == nil {
-		donationRequestRepository = &DonationRequestRepository{
-			db:                 db,
-			userRepository:     userRepository,
-			donationRepository: donationRepository,
-		}
+func NewDonationRequestRepository(db *sqlx.DB, userRepository *UserRepository, donationRepository *DonationRepository) *DonationRequestRepository {
+	return &DonationRequestRepository{
+		db:                 db,
+		userRepository:     userRepository,
+		donationRepository: donationRepository,
 	}
-
-	return donationRequestRepository
 }
 
 func (r *DonationRequestRepository) CreateDonationRequest(requesterID uint, mealIDs []uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		request := DonationRequest{
-			RequesterID: requesterID,
-			Status:      "pending",
-		}
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
-		if err := tx.Create(&request).Error; err != nil {
+	// Create Request
+	result, err := tx.Exec(queries.CreateDonationRequest, requesterID, "pending")
+	if err != nil {
+		return err
+	}
+	requestID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	// Create Meals
+	for _, mealID := range mealIDs {
+		_, err := tx.Exec(queries.CreateDonationRequestMeal, requestID, mealID)
+		if err != nil {
 			return err
 		}
+	}
 
-		for _, mealID := range mealIDs {
-			preference := DonationRequestMeal{
-				DonationRequestID: request.ID,
-				MealID:            mealID,
-			}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 
-			if err := tx.Create(&preference).Error; err != nil {
-				return err
-			}
-		}
-
-		return r.CheckAndFulfillDonationRequests()
-	})
+	return r.CheckAndFulfillDonationRequests()
 }
 
 func (r *DonationRequestRepository) GetDonationRequestsByStatus(status string) ([]DonationRequest, error) {
 	var requests []DonationRequest
 
-	result := r.db.Preload("Requester").
-		Where("status = ?", status).
-		Order("created_at ASC").
-		Find(&requests)
+	rows, err := r.db.Queryx(queries.GetRequestsByStatus, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	return requests, result.Error
+	for rows.Next() {
+		var dr DonationRequest
+		var u User
+		
+		err := rows.Scan(
+			&dr.ID, &dr.CreatedAt, &dr.UpdatedAt, &dr.RequesterID, &dr.Status, &dr.DonationID,
+			&u.ID, &u.Name,
+		)
+		if err != nil {
+			return nil, err
+		}
+		dr.Requester = u
+		requests = append(requests, dr)
+	}
+
+	return requests, nil
 }
 
 func (r *DonationRequestRepository) UpdateDonationRequestStatus(requestID uint, status string, donationID *uint) error {
-	updates := map[string]interface{}{
-		"status": status,
-	}
-
-	if donationID != nil {
-		updates["donation_id"] = donationID
-	}
-
-	result := r.db.Model(&DonationRequest{}).
-		Where("id = ?", requestID).
-		Updates(updates)
-
-	return result.Error
+	_, err := r.db.Exec(queries.UpdateRequestStatus, status, donationID, requestID)
+	return err
 }
 
 func (r *DonationRequestRepository) GetDonationRequestsByRequesterName(requesterName string, date string) ([]DonationRequest, error) {
-	var user User
-	if err := r.db.Where("name = ?", requesterName).First(&user).Error; err != nil {
+	user, err := r.userRepository.GetUserByName(requesterName)
+	if err != nil {
 		return nil, err
 	}
 
 	var requests []DonationRequest
-	result := r.db.Joins("Requester").Joins("Donation").Joins("Donation.Donor").Joins("Donation.Meal").
-		Where("requester_id = ? AND status = 'pending' AND DATE(donation_requests.created_at) = DATE(?) ", user.ID, date).
-		Order("created_at DESC").
-		Find(&requests)
+	rows, err := r.db.Queryx(queries.GetRequestsByRequester, user.ID, date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-	return requests, result.Error
-}
+	for rows.Next() {
+		var dr DonationRequest
+		var u User
+		var d Donation
+		var m Meal
+		var donor User
+		
+		var donationID *uint
+		var donationMealID *uint
+		var donationDonorID *uint
+		var donorID *uint
+		var donorName *string
+		var mealID *uint
+		var mealDesc *string
+		var mealDate *string
 
-func (r *DonationRequestRepository) GetDonationRequestById(id uint) (DonationRequest, error) {
-	var request DonationRequest
-	result := r.db.Preload("Requester").Preload("Donation").Preload("Donation.Donor").Preload("Donation.Meal").
-		First(&request, id)
+		err := rows.Scan(
+			&dr.ID, &dr.CreatedAt, &dr.UpdatedAt, &dr.RequesterID, &dr.Status, &dr.DonationID,
+			&u.ID, &u.Name,
+			&donationID, &donationMealID, &donationDonorID,
+			&donorID, &donorName,
+			&mealID, &mealDesc, &mealDate,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		dr.Requester = u
+		
+		if donationID != nil {
+			d.ID = *donationID
+			d.MealID = *donationMealID
+			d.DonorID = *donationDonorID
+			
+			if donorID != nil {
+				donor.ID = *donorID
+				donor.Name = *donorName
+				d.Donor = donor
+			}
+			if mealID != nil {
+				m.ID = *mealID
+				m.Description = *mealDesc
+				m.Date = *mealDate
+				d.Meal = m
+			}
+			dr.Donation = d
+		}
+		
+		requests = append(requests, dr)
+	}
 
-	return request, result.Error
+	return requests, nil
 }
 
 func (r *DonationRequestRepository) GetDonationRequestMealPreferences(requestID uint) ([]Meal, error) {
 	var meals []Meal
-
-	result := r.db.Table("meals").
-		Joins("JOIN donation_request_meals ON meals.id = donation_request_meals.meal_id").
-		Where("donation_request_meals.donation_request_id = ?", requestID).
-		Find(&meals)
-
-	return meals, result.Error
+	err := r.db.Select(&meals, queries.GetRequestMeals, requestID)
+	return meals, err
 }
 
 func (r *DonationRequestRepository) CheckAndFulfillDonationRequests() error {
-
 	pendingRequests, err := r.GetDonationRequestsByStatus("pending")
 	if err != nil {
 		return err
@@ -129,10 +175,10 @@ func (r *DonationRequestRepository) CheckAndFulfillDonationRequests() error {
 			preferredMealIDs = append(preferredMealIDs, meal.ID)
 		}
 
-		var mealDate string
-		if err := r.db.Model(&Meal{}).Where("id = ?", preferredMealIDs[0]).Select("date").Scan(&mealDate).Error; err != nil {
+		if len(preferredMeals) == 0 {
 			continue
 		}
+		mealDate := preferredMeals[0].Date
 
 		unclaimedDonations, err := r.donationRepository.GetUnclaimedDonationsByDate(mealDate)
 		if err != nil || len(unclaimedDonations) == 0 {
@@ -156,28 +202,27 @@ func (r *DonationRequestRepository) CheckAndFulfillDonationRequests() error {
 			continue
 		}
 
-		err = r.db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Model(&Donation{}).
-				Where("id = ?", matchingDonation.ID).
-				Update("recipient_id", request.RequesterID).Error; err != nil {
-				return err
-			}
-
-			if err := tx.Model(&DonationRequest{}).
-				Where("id = ?", request.ID).
-				Updates(map[string]interface{}{
-					"status":      "fulfilled",
-					"donation_id": matchingDonation.ID,
-				}).Error; err != nil {
-				return err
-			}
-
-			return nil
-		})
-
+		// Fulfill
+		tx, err := r.db.Beginx()
 		if err != nil {
+			return err
+		}
+
+		// Update Donation
+		_, err = tx.Exec(queries.ClaimDonation, request.RequesterID, matchingDonation.ID)
+		if err != nil {
+			tx.Rollback()
 			continue
 		}
+
+		// Update Request
+		_, err = tx.Exec(queries.UpdateRequestStatus, "fulfilled", matchingDonation.ID, request.ID)
+		if err != nil {
+			tx.Rollback()
+			continue
+		}
+
+		tx.Commit()
 	}
 
 	return nil

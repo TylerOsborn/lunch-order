@@ -1,63 +1,48 @@
 package repository
 
 import (
-	"gorm.io/gorm"
+	"github.com/jmoiron/sqlx"
+	"lunchorder/queries"
 )
 
 type MealRepository struct {
-	db *gorm.DB
+	db *sqlx.DB
 }
 
 var mealRepository *MealRepository
 
-func NewMealRepository(db *gorm.DB) *MealRepository {
-	if mealRepository == nil {
-		mealRepository = &MealRepository{
-			db: db,
-		}
+func NewMealRepository(db *sqlx.DB) *MealRepository {
+	return &MealRepository{
+		db: db,
 	}
-
-	return mealRepository
 }
 
 func (r *MealRepository) CreateMeal(meal *Meal) error {
 	var existingMeal Meal
-	result := r.db.First(&existingMeal, "description = ? AND date = ?", meal.Description, meal.Date)
+	err := r.db.Get(&existingMeal, queries.GetMealByDescDate, meal.Description, meal.Date)
 
-	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
-		return result.Error
+	if err == nil && existingMeal.ID != 0 {
+		return nil // Already exists
 	}
 
-	if existingMeal.ID != 0 {
-		return nil
-	}
-
-	result = r.db.Create(meal)
-
-	return result.Error
+	_, err = r.db.Exec(queries.CreateMeal, meal.Description, meal.Date)
+	return err
 }
 
 func (r *MealRepository) GetMealsByDate(date string) ([]Meal, error) {
 	var meals []Meal
-
-	result := r.db.Find(&meals, "date = ?", date)
-
-	if result.Error != nil {
-		return nil, result.Error
+	err := r.db.Select(&meals, queries.GetMealsByDate, date)
+	if err != nil {
+		return nil, err
 	}
-
 	return meals, nil
 }
 
 func (r *MealRepository) GetMealsByDates(startDate string, endDate string) ([]Meal, error) {
-
 	var meals []Meal
-
-	result := r.db.Where("date >= ? AND date <= ?", startDate, endDate).Find(&meals)
-
-	if result.Error != nil {
-		return nil, result.Error
+	err := r.db.Select(&meals, queries.GetMealsByRange, startDate, endDate)
+	if err != nil {
+		return nil, err
 	}
-
 	return meals, nil
 }

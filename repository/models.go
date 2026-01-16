@@ -1,39 +1,47 @@
 package repository
 
-import "gorm.io/gorm"
+import "time"
 
 type Meal struct {
-	gorm.Model
-	Description string `json:"description"`
-	Date        string `json:"date"`
+	ID          uint       `db:"id"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at"`
+	Description string     `json:"description" db:"description"`
+	Date        string     `json:"date" db:"date"`
 }
 
 type User struct {
-	gorm.Model
-	Name string `json:"Name" gorm:"unique not null"`
+	ID        uint       `db:"id"`
+	CreatedAt time.Time  `db:"created_at"`
+	UpdatedAt time.Time  `db:"updated_at"`
+	Name      string     `json:"Name" db:"name"`
 }
 
 type Donation struct {
-	gorm.Model
-	MealID      uint  `json:"mealId"`
-	Meal        Meal  `json:"meal" gorm:"foreignKey:MealID"`
-	DonorID     uint  `json:"donorId"`
-	Donor       User  `json:"donor" gorm:"foreignKey:DonorID"`
-	RecipientID *uint `json:"recipientId"`
-	Recipient   User  `json:"recipient" gorm:"foreignKey:RecipientID"`
+	ID          uint       `db:"id"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at"`
+	MealID      uint       `json:"mealId" db:"meal_id"`
+	Meal        Meal       `json:"meal" db:"meal"`
+	DonorID     uint       `json:"donorId" db:"donor_id"`
+	Donor       User       `json:"donor" db:"donor"`
+	RecipientID *uint      `json:"recipientId" db:"recipient_id"`
+	Recipient   User       `json:"recipient" db:"recipient"`
 }
 
 type DonationRequest struct {
-	gorm.Model
-	RequesterID uint     `json:"requesterId"`
-	Requester   User     `json:"requester" gorm:"foreignKey:RequesterID"`
-	Status      string   `json:"status"` // "pending", "fulfilled", "cancelled"
-	DonationID  *uint    `json:"donationId"`
-	Donation    Donation `json:"donation" gorm:"foreignKey:DonationID"`
+	ID          uint       `db:"id"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at"`
+	RequesterID uint       `json:"requesterId" db:"requester_id"`
+	Requester   User       `json:"requester" db:"requester"`
+	Status      string     `json:"status" db:"status"` // "pending", "fulfilled", "cancelled"
+	DonationID  *uint      `json:"donationId" db:"donation_id"`
+	Donation    Donation   `json:"donation" db:"donation"`
 }
 
 type DonationRequestMeal struct {
-	DonationRequestID uint `gorm:"primaryKey"`
-	MealID            uint `gorm:"primaryKey"`
-	Meal              Meal
+	DonationRequestID uint `db:"donation_request_id"`
+	MealID            uint `db:"meal_id"`
+	Meal              Meal `db:"meal"`
 }

@@ -1,69 +1,96 @@
 package main
 
 import (
-	"errors"
+	"embed"
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
-	"lunchorder/constants"
-	"lunchorder/models"
+	"lunchorder/handlers"
 	"lunchorder/repository"
+	"lunchorder/router"
 	"lunchorder/service"
-	"lunchorder/utils"
-	"net/http"
 	"os"
-	"strings"
-	"time"
+	"os/exec"
+	"path/filepath"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	_ "github.com/mattn/go-sqlite3"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 )
 
-var db *gorm.DB
-
-var donationRepository *repository.DonationRepository
-var mealRepository *repository.MealRepository
-var userRepository *repository.UserRepository
-var donationRequestRepository *repository.DonationRequestRepository
-
-var donationService *service.DonationService
-var mealService *service.MealService
-var donationRequestService *service.DonationRequestService
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 func main() {
 	var err error
 
 	err = loadEnvironmentVariables(err)
 
-	err = getDBConfig()
+	db, err := getDBConfig()
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 	initDB(db)
 
-	mealRepository = repository.NewMealRepository(db)
-	userRepository = repository.NewUserRepository(db)
-	donationRepository = repository.NewDonationRepository(db, userRepository)
-	donationRequestRepository = repository.NewDonationRequestRepository(db, userRepository, donationRepository)
+	// Repositories
+	mealRepository := repository.NewMealRepository(db)
+	userRepository := repository.NewUserRepository(db)
+	donationRepository := repository.NewDonationRepository(db, userRepository)
+	donationRequestRepository := repository.NewDonationRequestRepository(db, userRepository, donationRepository)
 
-	donationService = service.NewDonationService(donationRepository, mealRepository, userRepository)
-	mealService = service.NewMealService(mealRepository)
-	donationRequestService = service.NewDonationRequestService(donationRequestRepository, donationRepository, userRepository)
+	// Services
+	donationService := service.NewDonationService(donationRepository, mealRepository, userRepository)
+	mealService := service.NewMealService(mealRepository)
+	donationRequestService := service.NewDonationRequestService(donationRequestRepository, donationRepository, userRepository)
+
+	// Handlers
+	mealHandler := handlers.NewMealHandler(mealService)
+	donationHandler := handlers.NewDonationHandler(donationService, donationRequestService)
+	donationRequestHandler := handlers.NewDonationRequestHandler(donationRequestService)
 
 	// Route setup
 	r := gin.Default()
-	setupCors(r)
-	setupFrontEnd(r)
-	setupRoutes(r)
+	router.SetupCors(r)
+	router.SetupFrontEnd(r)
+	router.SetupRoutes(r, mealHandler, donationHandler, donationRequestHandler)
 
 	// Start server
 	err = r.Run(":8080")
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
+}
+
+func init() {
+	log.Println("Building frontend...")
+
+	// Check if node_modules directory exists
+	if _, err := os.Stat(filepath.Join("frontend", "node_modules")); os.IsNotExist(err) {
+		log.Println("node_modules not found, running npm install...")
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = "frontend"
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("Failed to run npm install: %v\n%s", err, output)
+		}
+		log.Println("npm install completed successfully")
+	} else {
+		log.Println("node_modules found, skipping npm install")
+	}
+
+	cmd := exec.Command("npm", "run", "build")
+	cmd.Dir = "frontend"
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to build frontend: %v\n%s", err, output)
+	}
+
+	log.Println("Frontend built successfully")
+	log.Println(string(output))
 }
 
 func loadEnvironmentVariables(err error) error {
@@ -74,9 +101,7 @@ func loadEnvironmentVariables(err error) error {
 	return err
 }
 
-func getDBConfig() error {
-	var err error
-
+func getDBConfig() (*sqlx.DB, error) {
 	user, foundUser := os.LookupEnv("MYSQL_USER")
 	password, foundPassword := os.LookupEnv("MYSQL_PASSWORD")
 	host, foundHost := os.LookupEnv("MYSQL_HOST")
@@ -84,390 +109,35 @@ func getDBConfig() error {
 	database, foundDatabase := os.LookupEnv("MYSQL_DATABASE")
 
 	if !foundUser || !foundPassword || !foundHost || !foundPort || !foundDatabase {
-		panic("Missing required environment variables")
+		return nil, fmt.Errorf("missing required environment variables")
 	}
 
-	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", user, password, host, port, database)
-	db, err = gorm.Open(mysql.Open(finalString), &gorm.Config{})
+	finalString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, password, host, port, database)
+	db, err := sqlx.Connect("mysql", finalString)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return err
+	return db, nil
 }
 
-func setupCors(r *gin.Engine) {
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-}
-
-func initDB(db *gorm.DB) {
-	err := db.Migrator().AutoMigrate(&repository.Meal{})
+func initDB(db *sqlx.DB) {
+	driver, err := mysql.WithInstance(db.DB, &mysql.Config{})
 	if err != nil {
-		panic(err)
+		log.Fatal("Failed to create migration driver: ", err)
 	}
 
-	err = db.Migrator().AutoMigrate(&repository.User{})
+	d, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
-		panic(err)
+		log.Fatal("Failed to create migration source: ", err)
 	}
 
-	err = db.Migrator().AutoMigrate(&repository.Donation{})
+	m, err := migrate.NewWithInstance("iofs", d, "mysql", driver)
 	if err != nil {
-		panic(err)
+		log.Fatal("Failed to create migration instance: ", err)
 	}
 
-	err = db.Migrator().AutoMigrate(&repository.DonationRequest{})
-	if err != nil {
-		panic(err)
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal("Failed to run migrations: ", err)
 	}
-
-	err = db.Migrator().AutoMigrate(&repository.DonationRequestMeal{})
-	if err != nil {
-		panic(err)
-	}
-}
-
-func setupFrontEnd(r *gin.Engine) {
-	r.Static("/assets", "./frontend/dist/assets")
-	r.StaticFile("/vite.svg", "./frontend/dist/vite.svg")
-	r.NoRoute(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		if !strings.HasPrefix(path, "/api") && !strings.Contains(path, ".") {
-			c.File("./frontend/dist/index.html")
-		} else {
-			c.Next()
-		}
-	})
-}
-
-func setupRoutes(r *gin.Engine) {
-	r.GET("/Api/Meal", HandleGetMeals)
-
-	r.POST("/Api/Meal/Upload", HandleMealUpload)
-	r.GET("/Api/Meal/Today", HandleGetMealsToday)
-
-	r.POST("/Api/Donation", HandleDonateMeal)
-	r.GET("/Api/Donation", HandleGetUnclaimedDonations)
-
-	r.POST("/Api/Donation/Claim", HandleDonationClaim)
-	r.GET("/Api/Donation/Claim", HandleGetDonationClaim)
-
-	r.GET("/Api/Stats/Claims/Summary", HandleGetDonationSummary)
-
-	// Donation request routes
-	r.POST("/Api/DonationRequest", HandleCreateDonationRequest)
-	r.GET("/Api/DonationRequest", HandleGetPendingDonationRequests)
-	r.GET("/Api/DonationRequest/User", HandleGetUserDonationRequests)
-}
-
-func HandleGetDonationSummary(context *gin.Context) {
-	date := context.Query("date")
-
-	if date == "" {
-		date = time.Now().Format(constants.DATE_FORMAT)
-	}
-
-	donationClaimSummaries, err := donationService.GetDonationsSummaryByDate(date)
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       donationClaimSummaries,
-	})
-}
-
-func HandleDonationClaim(context *gin.Context) {
-	var donationClaim models.RecipientRequest
-	err := context.BindJSON(&donationClaim)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	err = donationService.ClaimDonation(&donationClaim)
-
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-	})
-}
-
-func HandleGetDonationClaim(context *gin.Context) {
-	var claimantName string
-	claimantName = context.Query("name")
-
-	if claimantName == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "name is a required query parameter",
-		})
-		return
-	}
-
-	claimed, err := donationService.GetDonationClaimByClaimantName(claimantName)
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	if claimed.ID <= 0 {
-		context.JSON(http.StatusNotFound, models.ApiResult{
-			StatusCode: http.StatusNotFound,
-			Error:      "No claimed donations found",
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       claimed,
-	})
-}
-
-func HandleGetUnclaimedDonations(context *gin.Context) {
-	var donations []models.UnclaimedDonationResponse
-
-	today := time.Now().Format(constants.DATE_FORMAT)
-
-	donations, err := donationService.GetUnclaimedDonationsByDate(today)
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       donations,
-	})
-
-}
-
-func HandleDonateMeal(context *gin.Context) {
-	var donationRequest models.DonationRequest
-	err := context.BindJSON(&donationRequest)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	err = donationService.CreateDonation(&donationRequest)
-
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	if donationRequestService != nil {
-		_ = donationRequestService.CheckAndFulfillDonationRequests()
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-	})
-}
-
-func HandleGetMealsToday(context *gin.Context) {
-	var meals []models.MealResponse
-	today := time.Now().Format(constants.DATE_FORMAT)
-
-	meals, err := mealService.GetMealsByDate(today)
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       meals,
-	})
-}
-
-func HandleMealUpload(context *gin.Context) {
-	var mealUpload models.MealUploadRequest
-	err := context.BindJSON(&mealUpload)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	err = mealService.CreateMeals(mealUpload)
-
-	if errors.Is(err, utils.ErrIncorrectCSVFormat) {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-	})
-}
-
-func HandleGetMeals(context *gin.Context) {
-	startDate := context.Query("startDate")
-	endDate := context.Query("endDate")
-
-	if startDate == "" || endDate == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "startDate and endDate are required query parameters",
-		})
-		return
-	}
-
-	meals, err := mealService.GetMealsByDates(startDate, endDate)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       meals,
-	})
-}
-
-// HandleCreateDonationRequest creates a new donation request
-func HandleCreateDonationRequest(context *gin.Context) {
-	var donationRequestData models.DonationRequestCreate
-	err := context.BindJSON(&donationRequestData)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	// Validate request data
-	if donationRequestData.RequesterName == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "requesterName is required",
-		})
-		return
-	}
-
-	if len(donationRequestData.MealIds) == 0 {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "at least one meal must be selected",
-		})
-		return
-	}
-
-	err = donationRequestService.CreateDonationRequest(&donationRequestData)
-	if err != nil {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	// After creating the request, check if any requests can be fulfilled with available donations
-	donationRequestService.CheckAndFulfillDonationRequests()
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-	})
-}
-
-func HandleGetPendingDonationRequests(context *gin.Context) {
-	requests, err := donationRequestService.GetDonationRequestsByStatus("pending")
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       requests,
-	})
-}
-
-func HandleGetUserDonationRequests(context *gin.Context) {
-	userName := context.Query("name")
-	if userName == "" {
-		context.JSON(http.StatusBadRequest, models.ApiResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      "name is a required query parameter",
-		})
-		return
-	}
-
-	date := context.Query("date")
-
-	requests, err := donationRequestService.GetDonationRequestsByRequesterName(userName, date)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, models.ApiResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      err.Error(),
-		})
-		return
-	}
-
-	context.JSON(http.StatusOK, models.ApiResult{
-		StatusCode: http.StatusOK,
-		Data:       requests,
-	})
+	log.Println("Migrations ran successfully")
 }
