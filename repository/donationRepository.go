@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"github.com/jmoiron/sqlx"
 	"log"
 	"lunchorder/queries"
@@ -22,8 +23,21 @@ func NewDonationRepository(db *sqlx.DB, userRepository *UserRepository) *Donatio
 }
 
 func (r *DonationRepository) CreateDonation(donation *Donation) error {
-	_, err := r.db.Exec(queries.CreateDonation, donation.MealID, donation.DonorID)
-	return err
+	result, err := r.db.Exec(queries.CreateDonation, donation.MealID, donation.DonorID, donation.DonorID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return errors.New("user has already donated today")
+	}
+
+	return nil
 }
 
 func (r *DonationRepository) ClaimDonation(donationId uint, user *User) (bool, error) {
@@ -50,7 +64,7 @@ func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donatio
 		var d Donation
 		var m Meal
 		var u User
-		
+
 		err := rows.Scan(
 			&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
 			&m.ID, &m.Description, &m.Date,
@@ -59,7 +73,7 @@ func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donatio
 		if err != nil {
 			return nil, err
 		}
-		
+
 		d.Meal = m
 		d.Donor = u
 		unclaimedDonations = append(unclaimedDonations, d)
@@ -70,7 +84,7 @@ func (r *DonationRepository) GetUnclaimedDonationsByDate(date string) ([]Donatio
 
 func (r *DonationRepository) GetDonationsSummaryByDate(date string) (*[]Donation, error) {
 	var donations []Donation
-	
+
 	rows, err := r.db.Queryx(queries.GetDonationsSummary, date)
 	if err != nil {
 		return nil, err
@@ -91,14 +105,14 @@ func (r *DonationRepository) GetDonationsSummaryByDate(date string) (*[]Donation
 			&donor.ID, &donor.Name,
 			&recipientID, &recipientName,
 		)
-		
+
 		if err != nil {
 			return nil, err
 		}
 
 		d.Meal = m
 		d.Donor = donor
-		
+
 		if recipientID != nil {
 			recipient.ID = *recipientID
 			if recipientName != nil {
@@ -106,7 +120,7 @@ func (r *DonationRepository) GetDonationsSummaryByDate(date string) (*[]Donation
 			}
 			d.Recipient = recipient
 		}
-		
+
 		donations = append(donations, d)
 	}
 
@@ -117,21 +131,21 @@ func (r *DonationRepository) GetDonationClaimByClaimantName(name string) (Donati
 	var d Donation
 	var m Meal
 	var donor User
-	
+
 	row := r.db.QueryRowx(queries.GetDonationClaimByName, name, time.Now())
-	
+
 	err := row.Scan(
 		&d.ID, &d.CreatedAt, &d.UpdatedAt, &d.MealID, &d.DonorID, &d.RecipientID,
 		&m.ID, &m.Description, &m.Date,
 		&donor.ID, &donor.Name,
 	)
-	
+
 	if err != nil {
 		return d, err
 	}
-	
+
 	d.Meal = m
 	d.Donor = donor
-	
+
 	return d, nil
 }
