@@ -38,3 +38,35 @@ func (r *UserRepository) GetUserByName(name string) (*User, error) {
 	}
 	return &user, nil
 }
+
+func (r *UserRepository) GetUserByGoogleID(googleID string) (*User, error) {
+	var user User
+	err := r.db.Get(&user, queries.GetUserByGoogleID, googleID)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) GetUserByID(id uint) (*User, error) {
+	var user User
+	err := r.db.Get(&user, queries.GetUserByID, id)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) UpsertUser(user *User) error {
+	_, err := r.db.NamedExec(queries.UpsertUserGoogle, user)
+	if err != nil {
+		return err
+	}
+	// Fetch the user back to get the ID
+	updatedUser, err := r.GetUserByGoogleID(*user.GoogleID)
+	if err != nil {
+		return err
+	}
+	user.ID = updatedUser.ID
+	return nil
+}

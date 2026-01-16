@@ -9,6 +9,7 @@
             placeholder="Name"
             id="name"
             v-model="name"
+            disabled
         />
         <small v-if="userNameInputErrorText !== ''" id="name-help" class="error-text">
           {{ userNameInputErrorText }}
@@ -48,12 +49,13 @@ import {computed, ref} from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { useRouter } from 'vue-router';
 import type { Meal, ApiResult } from '../models/models';
-import { getNameFromCookie, setNameCookie } from '../utils/utils';
+import { setNameCookie } from '../utils/utils';
 import Listbox from 'primevue/listbox';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import api from "../axios/axios.ts";
 import { useToast } from 'primevue/usetoast';
+import { userStore } from '../store/user';
 
 const toast = useToast();
 
@@ -61,7 +63,7 @@ const toast = useToast();
 const router = useRouter();
 const queryClient = useQueryClient();
 
-const name = ref(getNameFromCookie());
+const name = ref(userStore.user?.name || '');
 const selectedMealType = ref(0);
 const userNameInputErrorText = ref('');
 const mealInputErrorText = ref('');

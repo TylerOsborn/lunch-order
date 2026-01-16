@@ -2,30 +2,47 @@ package router
 
 import (
 	"lunchorder/handlers"
+	"lunchorder/repository"
 	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, mealHandler *handlers.MealHandler, donationHandler *handlers.DonationHandler, donationRequestHandler *handlers.DonationRequestHandler) {
-	r.GET("/Api/Meal", mealHandler.HandleGetMeals)
+func SetupRoutes(r *gin.Engine, mealHandler *handlers.MealHandler, donationHandler *handlers.DonationHandler, donationRequestHandler *handlers.DonationRequestHandler, authHandler *handlers.AuthHandler, userRepo *repository.UserRepository) {
+	// Auth routes
+	r.GET("/auth/google/login", authHandler.GoogleLogin)
+	r.GET("/auth/google/callback", authHandler.GoogleCallback)
+	r.POST("/auth/logout", authHandler.Logout)
 
-	r.POST("/Api/Meal/Upload", mealHandler.HandleMealUpload)
-	r.GET("/Api/Meal/Today", mealHandler.HandleGetMealsToday)
+	// Protected routes
+	api := r.Group("/Api")
+	api.Use(handlers.AuthMiddleware(userRepo))
+	{
+		api.GET("/Me", authHandler.GetMe)
 
-	r.POST("/Api/Donation", donationHandler.HandleDonateMeal)
-	r.GET("/Api/Donation", donationHandler.HandleGetUnclaimedDonations)
+		api.GET("/Meal", mealHandler.HandleGetMeals)
+		api.GET("/Meal/Today", mealHandler.HandleGetMealsToday)
 
-	r.POST("/Api/Donation/Claim", donationHandler.HandleDonationClaim)
-	r.GET("/Api/Donation/Claim", donationHandler.HandleGetDonationClaim)
+		api.POST("/Donation", donationHandler.HandleDonateMeal)
+		api.GET("/Donation", donationHandler.HandleGetUnclaimedDonations)
 
-	r.GET("/Api/Stats/Claims/Summary", donationHandler.HandleGetDonationSummary)
+		api.POST("/Donation/Claim", donationHandler.HandleDonationClaim)
+		api.GET("/Donation/Claim", donationHandler.HandleGetDonationClaim)
 
-	// Donation request routes
-	r.POST("/Api/DonationRequest", donationRequestHandler.HandleCreateDonationRequest)
-	r.GET("/Api/DonationRequest", donationRequestHandler.HandleGetPendingDonationRequests)
-	r.GET("/Api/DonationRequest/User", donationRequestHandler.HandleGetUserDonationRequests)
+		// Donation request routes
+		api.POST("/DonationRequest", donationRequestHandler.HandleCreateDonationRequest)
+		api.GET("/DonationRequest", donationRequestHandler.HandleGetPendingDonationRequests)
+		api.GET("/DonationRequest/User", donationRequestHandler.HandleGetUserDonationRequests)
+
+		// Admin routes
+		admin := api.Group("/")
+		admin.Use(handlers.AdminMiddleware())
+		{
+			admin.POST("/Meal/Upload", mealHandler.HandleMealUpload)
+			admin.GET("/Stats/Claims/Summary", donationHandler.HandleGetDonationSummary)
+		}
+	}
 }
 
 func SetupCors(r *gin.Engine) {

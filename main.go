@@ -50,12 +50,13 @@ func main() {
 	mealHandler := handlers.NewMealHandler(mealService)
 	donationHandler := handlers.NewDonationHandler(donationService, donationRequestService)
 	donationRequestHandler := handlers.NewDonationRequestHandler(donationRequestService)
+	authHandler := handlers.NewAuthHandler(userRepository)
 
 	// Route setup
 	r := gin.Default()
 	router.SetupCors(r)
 	router.SetupFrontEnd(r)
-	router.SetupRoutes(r, mealHandler, donationHandler, donationRequestHandler)
+	router.SetupRoutes(r, mealHandler, donationHandler, donationRequestHandler, authHandler, userRepository)
 
 	// Start server
 	err = r.Run(":8080")

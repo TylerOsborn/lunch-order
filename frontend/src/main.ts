@@ -1,29 +1,12 @@
 import { createApp } from 'vue';
-import { createRouter, createWebHistory } from 'vue-router';
 import './style.css';
 import App from './App.vue';
 import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
 import ToastService from 'primevue/toastservice';
 import { VueQueryPlugin } from '@tanstack/vue-query'
-import HomeScreen from './components/HomeScreen.vue';
-import GiveMealScreen from './components/GiveMealScreen.vue';
-import ReceiveMealScreen from './components/ReceiveMealScreen.vue';
-import AdminScreen from './components/AdminScreen.vue';
-import DonationRequestScreen from './components/DonationRequestScreen.vue';
-
-const routes = [
-  { path: '/', component: HomeScreen },
-  { path: '/give-meal', component: GiveMealScreen },
-  { path: '/receive-meal', component: ReceiveMealScreen },
-  { path: '/donation-request', component: DonationRequestScreen },
-  { path: '/admin', component: AdminScreen },
-];
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-});
+import router from './router';
+import 'primeicons/primeicons.css';
 
 const app = createApp(App);
 app.use(router);

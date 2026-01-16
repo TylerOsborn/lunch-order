@@ -30,6 +30,7 @@
             :invalid="userNameInputError !== ''"
             class="full-width"
             placeholder="Name"
+            disabled
         />
         <small v-if="userNameInputError !== ''" class="error-text">{{ userNameInputError }}</small>
       </div>
@@ -69,14 +70,15 @@ import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import {useToast} from 'primevue/usetoast';
 import api from '../axios/axios';
-import {getNameFromCookie, setNameCookie} from '../utils/utils';
+import {setNameCookie} from '../utils/utils';
 import type {ApiResult, Donation} from '../models/models';
+import { userStore } from '../store/user';
 
 const router = useRouter();
 const toast = useToast();
 const queryClient = useQueryClient();
 
-const name = ref(getNameFromCookie() || '');
+const name = ref(userStore.user?.name || '');
 const selectedDonation = ref<Donation>({} as Donation);
 const dialogVisible = ref(false);
 const userNameInputError = ref('');

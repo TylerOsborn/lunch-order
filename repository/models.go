@@ -14,7 +14,13 @@ type User struct {
 	ID        uint       `db:"id"`
 	CreatedAt time.Time  `db:"created_at"`
 	UpdatedAt time.Time  `db:"updated_at"`
-	Name      string     `json:"Name" db:"name"`
+	Name      string     `json:"name" db:"name"`
+	Email     *string    `json:"email" db:"email"`
+	GoogleID  *string    `json:"googleId" db:"google_id"`
+	FirstName *string    `json:"firstName" db:"first_name"`
+	LastName  *string    `json:"lastName" db:"last_name"`
+	AvatarURL *string    `json:"avatarUrl" db:"avatar_url"`
+	IsAdmin   bool       `json:"isAdmin" db:"is_admin"`
 }
 
 type Donation struct {

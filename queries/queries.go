@@ -22,6 +22,15 @@ var CreateUser string
 //go:embed user/get_user_by_name.sql
 var GetUserByName string
 
+//go:embed user/upsert_user_google.sql
+var UpsertUserGoogle string
+
+//go:embed user/get_user_by_google_id.sql
+var GetUserByGoogleID string
+
+//go:embed user/get_user_by_id.sql
+var GetUserByID string
+
 // Donation
 //go:embed donation/create_donation.sql
 var CreateDonation string
