@@ -13,13 +13,9 @@ type MealService struct {
 var mealService *MealService
 
 func NewMealService(mealRepository *repository.MealRepository) *MealService {
-	if mealService == nil {
-		mealService = &MealService{
-			mealRepository: mealRepository,
-		}
+	return &MealService{
+		mealRepository: mealRepository,
 	}
-
-	return mealService
 }
 
 func (service *MealService) GetMealsByDates(start string, end string) ([]models.MealResponse, error) {

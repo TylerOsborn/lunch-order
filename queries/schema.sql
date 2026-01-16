@@ -1,0 +1,49 @@
+CREATE TABLE IF NOT EXISTS meals (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    description VARCHAR(255),
+    date VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS donations (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    meal_id INT UNSIGNED,
+    donor_id INT UNSIGNED,
+    recipient_id INT UNSIGNED,
+    FOREIGN KEY (meal_id) REFERENCES meals(id),
+    FOREIGN KEY (donor_id) REFERENCES users(id),
+    FOREIGN KEY (recipient_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS donation_requests (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    requester_id INT UNSIGNED,
+    status VARCHAR(50),
+    donation_id INT UNSIGNED NULL,
+    FOREIGN KEY (requester_id) REFERENCES users(id),
+    FOREIGN KEY (donation_id) REFERENCES donations(id)
+);
+
+CREATE TABLE IF NOT EXISTS donation_request_meals (
+    donation_request_id INT UNSIGNED,
+    meal_id INT UNSIGNED,
+    PRIMARY KEY (donation_request_id, meal_id),
+    FOREIGN KEY (donation_request_id) REFERENCES donation_requests(id),
+    FOREIGN KEY (meal_id) REFERENCES meals(id)
+);

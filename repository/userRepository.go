@@ -1,39 +1,40 @@
 package repository
 
 import (
-	"gorm.io/gorm"
+	"github.com/jmoiron/sqlx"
+	"lunchorder/queries"
 )
 
 type UserRepository struct {
-	db *gorm.DB
+	db *sqlx.DB
 }
 
 var userRepo *UserRepository
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	if userRepo == nil {
-		userRepo = &UserRepository{
-			db: db,
-		}
+func NewUserRepository(db *sqlx.DB) *UserRepository {
+	return &UserRepository{
+		db: db,
 	}
-
-	return userRepo
 }
 
 func (r *UserRepository) CreateUser(user *User) error {
-	result := r.db.Create(user)
-
-	return result.Error
+	result, err := r.db.Exec(queries.CreateUser, user.Name)
+	if err != nil {
+		return err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	user.ID = uint(id)
+	return nil
 }
 
 func (r *UserRepository) GetUserByName(name string) (*User, error) {
 	var user User
-
-	result := r.db.First(&user, "name = ?", name)
-
-	if result.Error != nil {
-		return nil, result.Error
+	err := r.db.Get(&user, queries.GetUserByName, name)
+	if err != nil {
+		return nil, err
 	}
-
 	return &user, nil
 }

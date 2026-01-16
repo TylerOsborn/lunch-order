@@ -1,8 +1,8 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
-	"gorm.io/gorm"
 	"lunchorder/models"
 	"lunchorder/repository"
 )
@@ -20,25 +20,21 @@ func NewDonationRequestService(
 	donationRepository *repository.DonationRepository,
 	userRepository *repository.UserRepository) *DonationRequestService {
 
-	if donationRequestService == nil {
-		donationRequestService = &DonationRequestService{
-			donationRequestRepository: donationRequestRepository,
-			donationRepository:        donationRepository,
-			userRepository:            userRepository,
-		}
+	return &DonationRequestService{
+		donationRequestRepository: donationRequestRepository,
+		donationRepository:        donationRepository,
+		userRepository:            userRepository,
 	}
-
-	return donationRequestService
 }
 
 func (s *DonationRequestService) CreateDonationRequest(request *models.DonationRequestCreate) error {
 	// Get or create user
 	user, err := s.userRepository.GetUserByName(request.RequesterName)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		user = &repository.User{Name: request.RequesterName}
 		if err := s.userRepository.CreateUser(user); err != nil {
 			return err
@@ -133,3 +129,4 @@ func (s *DonationRequestService) UpdateDonationRequestStatus(id uint, status str
 func (s *DonationRequestService) CheckAndFulfillDonationRequests() error {
 	return s.donationRequestRepository.CheckAndFulfillDonationRequests()
 }
+

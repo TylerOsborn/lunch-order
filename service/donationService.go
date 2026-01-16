@@ -1,8 +1,8 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
-	"gorm.io/gorm"
 	"lunchorder/models"
 	"lunchorder/repository"
 )
@@ -22,26 +22,22 @@ func NewDonationService(
 	mealRepository *repository.MealRepository,
 	userRepository *repository.UserRepository) *DonationService {
 
-	if donationService == nil {
-		donationService = &DonationService{
-			donationRepository: donationRepository,
-			mealRepository:     mealRepository,
-			userRepository:     userRepository,
-		}
+	return &DonationService{
+		donationRepository: donationRepository,
+		mealRepository:     mealRepository,
+		userRepository:     userRepository,
 	}
-
-	return donationService
 }
 
 func (service *DonationService) CreateDonation(donationRequest *models.DonationRequest) error {
 	var donation repository.Donation
 
 	donor, err := service.userRepository.GetUserByName(donationRequest.DonorName)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		donor = &repository.User{Name: donationRequest.DonorName}
 		err = service.userRepository.CreateUser(donor)
 	}
@@ -61,11 +57,11 @@ func (service *DonationService) CreateDonation(donationRequest *models.DonationR
 func (service *DonationService) ClaimDonation(donationClaim *models.RecipientRequest) error {
 	user, err := service.userRepository.GetUserByName(donationClaim.Name)
 
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		user = &repository.User{Name: donationClaim.Name}
 		err = service.userRepository.CreateUser(user)
 	}
@@ -126,11 +122,11 @@ func (service *DonationService) GetDonationsSummaryByDate(date string) ([]models
 func (service *DonationService) GetDonationClaimByClaimantName(name string) (models.ClaimedDonationResponse, error) {
 	donation, err := service.donationRepository.GetDonationClaimByClaimantName(name)
 
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return models.ClaimedDonationResponse{}, err
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return models.ClaimedDonationResponse{}, nil
 	}
 
@@ -142,3 +138,4 @@ func (service *DonationService) GetDonationClaimByClaimantName(name string) (mod
 		},
 	}, nil
 }
+
