@@ -1,4 +1,4 @@
-FROM golang:1.22.1 AS backend-builder
+FROM golang:1.24.12 AS backend-builder
 
 WORKDIR /lunch-order
 
