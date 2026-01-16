@@ -9,6 +9,8 @@ import (
 	"lunchorder/router"
 	"lunchorder/service"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
@@ -60,6 +62,35 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func init() {
+	log.Println("Building frontend...")
+
+	// Check if node_modules directory exists
+	if _, err := os.Stat(filepath.Join("frontend", "node_modules")); os.IsNotExist(err) {
+		log.Println("node_modules not found, running npm install...")
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = "frontend"
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("Failed to run npm install: %v\n%s", err, output)
+		}
+		log.Println("npm install completed successfully")
+	} else {
+		log.Println("node_modules found, skipping npm install")
+	}
+
+	cmd := exec.Command("npm", "run", "build")
+	cmd.Dir = "frontend"
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("Failed to build frontend: %v\n%s", err, output)
+	}
+
+	log.Println("Frontend built successfully")
+	log.Println(string(output))
 }
 
 func loadEnvironmentVariables(err error) error {
