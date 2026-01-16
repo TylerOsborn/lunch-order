@@ -82,7 +82,7 @@ func (h *MealHandler) HandleMealUpload(context *gin.Context) {
 }
 
 func (h *MealHandler) HandleGetMealsToday(context *gin.Context) {
-	today := time.Now().Format(constants.DATE_FORMAT)
+	today := time.Now().Format(constants.DateFormat)
 
 	meals, err := h.mealService.GetMealsByDate(today)
 

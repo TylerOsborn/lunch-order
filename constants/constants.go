@@ -1,3 +1,3 @@
 package constants
 
-const DATE_FORMAT = "2006-01-02"
+const DateFormat = "2006-01-02"

@@ -53,7 +53,7 @@ func (h *DonationHandler) HandleDonateMeal(context *gin.Context) {
 }
 
 func (h *DonationHandler) HandleGetUnclaimedDonations(context *gin.Context) {
-	today := time.Now().Format(constants.DATE_FORMAT)
+	today := time.Now().Format(constants.DateFormat)
 
 	donations, err := h.donationService.GetUnclaimedDonationsByDate(today)
 
@@ -136,7 +136,7 @@ func (h *DonationHandler) HandleGetDonationSummary(context *gin.Context) {
 	date := context.Query("date")
 
 	if date == "" {
-		date = time.Now().Format(constants.DATE_FORMAT)
+		date = time.Now().Format(constants.DateFormat)
 	}
 
 	donationClaimSummaries, err := h.donationService.GetDonationsSummaryByDate(date)
