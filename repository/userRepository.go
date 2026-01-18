@@ -3,19 +3,69 @@ package repository
 import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"log"
 	"lunchorder/queries"
+	"lunchorder/utils"
 )
 
 type UserRepository struct {
-	db *sqlx.DB
+	db            *sqlx.DB
+	encryptionKey []byte
 }
 
 var userRepo *UserRepository
 
 func NewUserRepository(db *sqlx.DB) *UserRepository {
-	return &UserRepository{
-		db: db,
+	key, err := utils.GetEncryptionKey()
+	if err != nil {
+		log.Fatal(err)
 	}
+	return &UserRepository{
+		db:            db,
+		encryptionKey: key,
+	}
+}
+
+func (r *UserRepository) prepareUserForSave(user *User) error {
+	if user.Email != nil {
+		enc, err := utils.Encrypt(*user.Email, r.encryptionKey)
+		if err != nil {
+			return err
+		}
+		user.EmailEncrypted = &enc
+
+		hash := utils.Hash(*user.Email, r.encryptionKey)
+		user.EmailHash = &hash
+	}
+	if user.GoogleID != nil {
+		enc, err := utils.Encrypt(*user.GoogleID, r.encryptionKey)
+		if err != nil {
+			return err
+		}
+		user.GoogleIDEncrypted = &enc
+
+		hash := utils.Hash(*user.GoogleID, r.encryptionKey)
+		user.GoogleIDHash = &hash
+	}
+	return nil
+}
+
+func (r *UserRepository) decryptUser(user *User) error {
+	if user.EmailEncrypted != nil {
+		dec, err := utils.Decrypt(*user.EmailEncrypted, r.encryptionKey)
+		if err != nil {
+			return err
+		}
+		user.Email = &dec
+	}
+	if user.GoogleIDEncrypted != nil {
+		dec, err := utils.Decrypt(*user.GoogleIDEncrypted, r.encryptionKey)
+		if err != nil {
+			return err
+		}
+		user.GoogleID = &dec
+	}
+	return nil
 }
 
 func (r *UserRepository) CreateUser(user *User) error {
@@ -37,13 +87,20 @@ func (r *UserRepository) GetUserByName(name string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := r.decryptUser(&user); err != nil {
+		return nil, err
+	}
 	return &user, nil
 }
 
 func (r *UserRepository) GetUserByGoogleID(googleID string) (*User, error) {
 	var user User
-	err := r.db.Get(&user, queries.GetUserByGoogleID, googleID)
+	hash := utils.Hash(googleID, r.encryptionKey)
+	err := r.db.Get(&user, queries.GetUserByGoogleID, hash)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.decryptUser(&user); err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -55,19 +112,31 @@ func (r *UserRepository) GetUserByID(id uint) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := r.decryptUser(&user); err != nil {
+		return nil, err
+	}
 	return &user, nil
 }
 
 func (r *UserRepository) GetUserByEmail(email string) (*User, error) {
 	var user User
-	err := r.db.Get(&user, queries.GetUserByEmail, email)
+	hash := utils.Hash(email, r.encryptionKey)
+	err := r.db.Get(&user, queries.GetUserByEmail, hash)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.decryptUser(&user); err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
 func (r *UserRepository) UpsertUser(user *User) error {
+	// Prepare encryption fields
+	if err := r.prepareUserForSave(user); err != nil {
+		return err
+	}
+
 	// 1. Check if user exists by Google ID
 	existingUser, err := r.GetUserByGoogleID(*user.GoogleID)
 	if err == nil {

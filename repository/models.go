@@ -11,16 +11,20 @@ type Meal struct {
 }
 
 type User struct {
-	ID        uint       `db:"id"`
-	CreatedAt time.Time  `db:"created_at"`
-	UpdatedAt time.Time  `db:"updated_at"`
-	Name      string     `json:"name" db:"name"`
-	Email     *string    `json:"email" db:"email"`
-	GoogleID  *string    `json:"googleId" db:"google_id"`
-	FirstName *string    `json:"firstName" db:"first_name"`
-	LastName  *string    `json:"lastName" db:"last_name"`
-	AvatarURL *string    `json:"avatarUrl" db:"avatar_url"`
-	IsAdmin   bool       `json:"isAdmin" db:"is_admin"`
+	ID                uint       `db:"id"`
+	CreatedAt         time.Time  `db:"created_at"`
+	UpdatedAt         time.Time  `db:"updated_at"`
+	Name              string     `json:"name" db:"name"`
+	Email             *string    `json:"email" db:"-"`
+	GoogleID          *string    `json:"googleId" db:"-"`
+	EmailHash         *string    `json:"-" db:"email_hash"`
+	EmailEncrypted    *string    `json:"-" db:"email_encrypted"`
+	GoogleIDHash      *string    `json:"-" db:"google_id_hash"`
+	GoogleIDEncrypted *string    `json:"-" db:"google_id_encrypted"`
+	FirstName         *string    `json:"firstName" db:"first_name"`
+	LastName          *string    `json:"lastName" db:"last_name"`
+	AvatarURL         *string    `json:"avatarUrl" db:"avatar_url"`
+	IsAdmin           bool       `json:"isAdmin" db:"is_admin"`
 }
 
 type Donation struct {
