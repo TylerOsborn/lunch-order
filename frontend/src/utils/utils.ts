@@ -1,5 +1,25 @@
-function zeroPad(num: number, places: number) {
+export function zeroPad(num: number, places: number) {
   return String(num).padStart(places, '0');
+}
+
+export function getSunday(d: Date) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day;
+  return new Date(date.setDate(diff));
+}
+
+export function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+export function formatDate(date: Date) {
+  const year = zeroPad(date.getFullYear(), 4);
+  const month = zeroPad(date.getMonth() + 1, 2);
+  const day = zeroPad(date.getDate(), 2);
+  return `${year}-${month}-${day}`;
 }
 
 export function mondayDate() {
