@@ -1,2 +1,2 @@
-INSERT INTO users (name, email, google_id, first_name, last_name, avatar_url, is_admin)
-VALUES (:name, :email, :google_id, :first_name, :last_name, :avatar_url, :is_admin);
+INSERT INTO users (name, email_hash, email_encrypted, google_id_hash, google_id_encrypted, first_name, last_name, avatar_url, is_admin)
+VALUES (:name, :email_hash, :email_encrypted, :google_id_hash, :google_id_encrypted, :first_name, :last_name, :avatar_url, :is_admin);

@@ -1,8 +1,9 @@
-INSERT INTO users (name, email, google_id, first_name, last_name, avatar_url, is_admin)
-VALUES (:name, :email, :google_id, :first_name, :last_name, :avatar_url, :is_admin)
+INSERT INTO users (name, email_hash, email_encrypted, google_id_hash, google_id_encrypted, first_name, last_name, avatar_url, is_admin)
+VALUES (:name, :email_hash, :email_encrypted, :google_id_hash, :google_id_encrypted, :first_name, :last_name, :avatar_url, :is_admin)
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
-    email = VALUES(email),
+    email_hash = VALUES(email_hash),
+    email_encrypted = VALUES(email_encrypted),
     first_name = VALUES(first_name),
     last_name = VALUES(last_name),
     avatar_url = VALUES(avatar_url),

@@ -1,1 +1,1 @@
-SELECT * FROM users WHERE google_id = ?;
+SELECT * FROM users WHERE google_id_hash = ?;

@@ -1,1 +1,1 @@
-SELECT * FROM users WHERE email = ?;
+SELECT * FROM users WHERE email_hash = ?;
