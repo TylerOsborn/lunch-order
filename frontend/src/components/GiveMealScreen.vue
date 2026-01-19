@@ -110,9 +110,6 @@ const validateDonationForm = (name: string, selectedMealType: number): boolean =
   if (!name || name.trim() === '') {
     userNameInputErrorText.value = 'Please enter a name';
     valid = false;
-  } else if (!/^(\w+\s?){1,5}$/.test(name)) {
-    userNameInputErrorText.value = 'Please enter a valid name';
-    valid = false;
   } else {
     userNameInputErrorText.value = '';
   }

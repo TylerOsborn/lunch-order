@@ -161,9 +161,6 @@ const validateDonationClaim = (userName: string, donation: Donation): boolean =>
   if (!userName || userName.trim() === '') {
     userNameInputError.value = 'Please enter a name';
     valid = false;
-  } else if (!/^(\w+\s?){1,5}$/.test(userName)) {
-    userNameInputError.value = 'Please enter a valid name';
-    valid = false;
   } else {
     userNameInputError.value = '';
   }
