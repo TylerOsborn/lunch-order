@@ -1,0 +1,2 @@
+-- Reverting character set expansion is generally not recommended as it can lead to data loss (e.g. truncating multibyte characters).
+-- This migration is intentionally left as a no-op for safety.
