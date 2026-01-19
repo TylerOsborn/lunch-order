@@ -1,0 +1,1 @@
+-- Reverting avatar_url length reduction is a no-op.
