@@ -62,7 +62,7 @@ func (h *MealOrderHandler) HandleCreateMealOrder(context *gin.Context) {
 	}
 
 	// Convert the denormalized request to normalized items
-	items := []repository.MealOrderItem{}
+	var items []repository.MealOrderItem
 	if request.MondayMealID != nil {
 		items = append(items, repository.MealOrderItem{
 			DayOfWeek: "Monday",
@@ -163,7 +163,7 @@ func (h *MealOrderHandler) HandleGetMealOrder(context *gin.Context) {
 				Description: item.Meal.Description,
 				Date:        item.Meal.Date,
 			}
-			
+
 			switch item.DayOfWeek {
 			case "Monday":
 				response.MondayMeal = mealResponse

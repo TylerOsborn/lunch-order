@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS meal_orders (
 
 CREATE TABLE IF NOT EXISTS meal_order_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     meal_order_id INT UNSIGNED NOT NULL,
     day_of_week ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday') NOT NULL,
     meal_id INT UNSIGNED NOT NULL,

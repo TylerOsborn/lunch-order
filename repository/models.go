@@ -67,9 +67,11 @@ type MealOrder struct {
 }
 
 type MealOrderItem struct {
-	ID          uint   `db:"id"`
-	MealOrderID uint   `db:"meal_order_id"`
-	DayOfWeek   string `db:"day_of_week"`
-	MealID      uint   `db:"meal_id"`
-	Meal        *Meal  `json:"meal" db:"-"`
+	ID          uint      `db:"id"`
+	CreatedAt   time.Time `db:"created_at"`
+	UpdatedAt   time.Time `db:"updated_at"`
+	MealOrderID uint      `db:"meal_order_id"`
+	DayOfWeek   string    `db:"day_of_week"`
+	MealID      uint      `db:"meal_id"`
+	Meal        *Meal     `json:"meal" db:"-"`
 }
