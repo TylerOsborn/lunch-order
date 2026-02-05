@@ -54,3 +54,20 @@ type DonationRequestResponse struct {
 	Description   string `json:"description"`
 	Status        string `json:"status"`
 }
+
+type MealOrderRequest struct {
+	WeekStartDate   string `json:"weekStartDate"`
+	MondayMealID    *uint  `json:"mondayMealId"`
+	TuesdayMealID   *uint  `json:"tuesdayMealId"`
+	WednesdayMealID *uint  `json:"wednesdayMealId"`
+	ThursdayMealID  *uint  `json:"thursdayMealId"`
+}
+
+type MealOrderResponse struct {
+	ID              uint          `json:"id"`
+	WeekStartDate   string        `json:"weekStartDate"`
+	MondayMeal      *MealResponse `json:"mondayMeal"`
+	TuesdayMeal     *MealResponse `json:"tuesdayMeal"`
+	WednesdayMeal   *MealResponse `json:"wednesdayMeal"`
+	ThursdayMeal    *MealResponse `json:"thursdayMeal"`
+}

@@ -46,3 +46,12 @@ func (r *MealRepository) GetMealsByDates(startDate string, endDate string) ([]Me
 	}
 	return meals, nil
 }
+
+func (r *MealRepository) GetMealByID(id uint) (*Meal, error) {
+	var meal Meal
+	err := r.db.Get(&meal, queries.GetMealByID, id)
+	if err != nil {
+		return nil, err
+	}
+	return &meal, nil
+}

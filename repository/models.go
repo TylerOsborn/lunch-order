@@ -55,3 +55,20 @@ type DonationRequestMeal struct {
 	MealID            uint `db:"meal_id"`
 	Meal              Meal `db:"meal"`
 }
+
+type MealOrder struct {
+	ID              uint      `db:"id"`
+	CreatedAt       time.Time `db:"created_at"`
+	UpdatedAt       time.Time `db:"updated_at"`
+	UserID          uint      `json:"userId" db:"user_id"`
+	User            User      `json:"user" db:"user"`
+	WeekStartDate   string    `json:"weekStartDate" db:"week_start_date"`
+	MondayMealID    *uint     `json:"mondayMealId" db:"monday_meal_id"`
+	MondayMeal      *Meal     `json:"mondayMeal" db:"monday_meal"`
+	TuesdayMealID   *uint     `json:"tuesdayMealId" db:"tuesday_meal_id"`
+	TuesdayMeal     *Meal     `json:"tuesdayMeal" db:"tuesday_meal"`
+	WednesdayMealID *uint     `json:"wednesdayMealId" db:"wednesday_meal_id"`
+	WednesdayMeal   *Meal     `json:"wednesdayMeal" db:"wednesday_meal"`
+	ThursdayMealID  *uint     `json:"thursdayMealId" db:"thursday_meal_id"`
+	ThursdayMeal    *Meal     `json:"thursdayMeal" db:"thursday_meal"`
+}
