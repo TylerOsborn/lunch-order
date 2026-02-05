@@ -4,6 +4,7 @@ import GiveMealScreen from './components/GiveMealScreen.vue';
 import ReceiveMealScreen from './components/ReceiveMealScreen.vue';
 import AdminScreen from './components/AdminScreen.vue';
 import DonationRequestScreen from './components/DonationRequestScreen.vue';
+import OrderMealScreen from './components/OrderMealScreen.vue';
 import LoginScreen from './components/LoginScreen.vue';
 import NotFound from './components/errors/404.vue';
 import Unauthorized from './components/errors/401.vue';
@@ -13,6 +14,7 @@ import { userStore } from './store/user';
 const routes = [
   { path: '/login', component: LoginScreen },
   { path: '/', component: HomeScreen, meta: { requiresAuth: true } },
+  { path: '/order-meal', component: OrderMealScreen, meta: { requiresAuth: true } },
   { path: '/give-meal', component: GiveMealScreen, meta: { requiresAuth: true } },
   { path: '/receive-meal', component: ReceiveMealScreen, meta: { requiresAuth: true } },
   { path: '/donation-request', component: DonationRequestScreen, meta: { requiresAuth: true } },
