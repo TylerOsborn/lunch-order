@@ -15,6 +15,9 @@ var GetMealsByDate string
 //go:embed meal/get_meals_by_range.sql
 var GetMealsByRange string
 
+//go:embed meal/get_meal_by_id.sql
+var GetMealByID string
+
 // User
 //go:embed user/create_user.sql
 var CreateUser string

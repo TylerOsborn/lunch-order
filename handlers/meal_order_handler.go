@@ -131,45 +131,53 @@ func (h *MealOrderHandler) HandleGetMealOrder(context *gin.Context) {
 		WeekStartDate: order.WeekStartDate,
 	}
 
-	// Load meal details
+	// Load meal details using GetMealByID for better performance
 	if order.MondayMealID != nil {
-		meals, _ := h.mealService.GetMealsByDate("")
-		for _, meal := range meals {
-			if meal.ID == *order.MondayMealID {
-				response.MondayMeal = &meal
-				break
-			}
+		meal, err := h.mealService.GetMealByID(*order.MondayMealID)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, models.ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      "Failed to load Monday meal details: " + err.Error(),
+			})
+			return
 		}
+		response.MondayMeal = meal
 	}
 
 	if order.TuesdayMealID != nil {
-		meals, _ := h.mealService.GetMealsByDate("")
-		for _, meal := range meals {
-			if meal.ID == *order.TuesdayMealID {
-				response.TuesdayMeal = &meal
-				break
-			}
+		meal, err := h.mealService.GetMealByID(*order.TuesdayMealID)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, models.ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      "Failed to load Tuesday meal details: " + err.Error(),
+			})
+			return
 		}
+		response.TuesdayMeal = meal
 	}
 
 	if order.WednesdayMealID != nil {
-		meals, _ := h.mealService.GetMealsByDate("")
-		for _, meal := range meals {
-			if meal.ID == *order.WednesdayMealID {
-				response.WednesdayMeal = &meal
-				break
-			}
+		meal, err := h.mealService.GetMealByID(*order.WednesdayMealID)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, models.ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      "Failed to load Wednesday meal details: " + err.Error(),
+			})
+			return
 		}
+		response.WednesdayMeal = meal
 	}
 
 	if order.ThursdayMealID != nil {
-		meals, _ := h.mealService.GetMealsByDate("")
-		for _, meal := range meals {
-			if meal.ID == *order.ThursdayMealID {
-				response.ThursdayMeal = &meal
-				break
-			}
+		meal, err := h.mealService.GetMealByID(*order.ThursdayMealID)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, models.ApiResult{
+				StatusCode: http.StatusInternalServerError,
+				Error:      "Failed to load Thursday meal details: " + err.Error(),
+			})
+			return
 		}
+		response.ThursdayMeal = meal
 	}
 
 	context.JSON(http.StatusOK, models.ApiResult{

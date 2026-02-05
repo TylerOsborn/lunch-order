@@ -42,16 +42,32 @@ func (r *MealOrderRepository) GetMealOrderByUserAndWeek(userID uint, weekStartDa
 		return nil, err
 	}
 
-	// Load meal details
+	// Load meal details using GetMealByID for better performance
 	if order.MondayMealID != nil {
-		meals, err := r.mealRepository.GetMealsByDate("") // Will need to get by ID
-		if err == nil && len(meals) > 0 {
-			for _, meal := range meals {
-				if meal.ID == *order.MondayMealID {
-					order.MondayMeal = &meal
-					break
-				}
-			}
+		meal, err := r.mealRepository.GetMealByID(*order.MondayMealID)
+		if err == nil {
+			order.MondayMeal = meal
+		}
+	}
+
+	if order.TuesdayMealID != nil {
+		meal, err := r.mealRepository.GetMealByID(*order.TuesdayMealID)
+		if err == nil {
+			order.TuesdayMeal = meal
+		}
+	}
+
+	if order.WednesdayMealID != nil {
+		meal, err := r.mealRepository.GetMealByID(*order.WednesdayMealID)
+		if err == nil {
+			order.WednesdayMeal = meal
+		}
+	}
+
+	if order.ThursdayMealID != nil {
+		meal, err := r.mealRepository.GetMealByID(*order.ThursdayMealID)
+		if err == nil {
+			order.ThursdayMeal = meal
 		}
 	}
 

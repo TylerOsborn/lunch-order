@@ -46,6 +46,19 @@ func (service *MealService) GetMealsByDate(today string) ([]models.MealResponse,
 	return results, err
 }
 
+func (service *MealService) GetMealByID(id uint) (*models.MealResponse, error) {
+	meal, err := service.mealRepository.GetMealByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.MealResponse{
+		ID:          meal.ID,
+		Date:        meal.Date,
+		Description: meal.Description,
+	}, nil
+}
+
 func (service *MealService) CreateMeal(meal *repository.Meal) error {
 	return service.mealRepository.CreateMeal(meal)
 }

@@ -105,12 +105,26 @@ const isSubmitting = ref(false);
 const existingOrder = ref<MealOrder | null>(null);
 
 // Get Monday of current or next week
+// If today is Monday-Thursday, return next Monday
+// If today is Friday-Sunday, return the Monday after next
 const getWeekStartDate = (): string => {
   const today = new Date();
-  const dayOfWeek = today.getDay();
-  const diff = dayOfWeek === 0 ? 1 : (dayOfWeek <= 4 ? 1 - dayOfWeek : 8 - dayOfWeek);
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  
+  let daysToAdd: number;
+  if (dayOfWeek === 0) {
+    // Sunday: get next Monday (1 day forward)
+    daysToAdd = 1;
+  } else if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+    // Monday-Thursday: get next week's Monday (8 - current day gets us to next Monday)
+    daysToAdd = 8 - dayOfWeek;
+  } else {
+    // Friday-Saturday: get next Monday (days remaining in week + 1)
+    daysToAdd = 8 - dayOfWeek;
+  }
+  
   const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
+  monday.setDate(today.getDate() + daysToAdd);
   return monday.toISOString().split('T')[0];
 };
 
