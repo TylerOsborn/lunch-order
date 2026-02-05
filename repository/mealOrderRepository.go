@@ -21,15 +21,42 @@ func NewMealOrderRepository(db *sqlx.DB, userRepository *UserRepository, mealRep
 }
 
 func (r *MealOrderRepository) CreateMealOrder(order *MealOrder) error {
-	_, err := r.db.Exec(queries.CreateMealOrder,
+	// Start a transaction
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Insert the meal order
+	result, err := tx.Exec(queries.CreateMealOrder,
 		order.UserID,
 		order.WeekStartDate,
-		order.MondayMealID,
-		order.TuesdayMealID,
-		order.WednesdayMealID,
-		order.ThursdayMealID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Get the inserted order ID
+	orderID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	// Insert meal order items
+	for _, item := range order.Items {
+		_, err := tx.Exec(queries.CreateMealOrderItem,
+			orderID,
+			item.DayOfWeek,
+			item.MealID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }
 
 func (r *MealOrderRepository) GetMealOrderByUserAndWeek(userID uint, weekStartDate string) (*MealOrder, error) {
@@ -42,35 +69,22 @@ func (r *MealOrderRepository) GetMealOrderByUserAndWeek(userID uint, weekStartDa
 		return nil, err
 	}
 
-	// Load meal details using GetMealByID for better performance
-	if order.MondayMealID != nil {
-		meal, err := r.mealRepository.GetMealByID(*order.MondayMealID)
+	// Load meal order items
+	var items []MealOrderItem
+	err = r.db.Select(&items, queries.GetMealOrderItems, order.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load meal details for each item
+	for i := range items {
+		meal, err := r.mealRepository.GetMealByID(items[i].MealID)
 		if err == nil {
-			order.MondayMeal = meal
+			items[i].Meal = meal
 		}
 	}
 
-	if order.TuesdayMealID != nil {
-		meal, err := r.mealRepository.GetMealByID(*order.TuesdayMealID)
-		if err == nil {
-			order.TuesdayMeal = meal
-		}
-	}
-
-	if order.WednesdayMealID != nil {
-		meal, err := r.mealRepository.GetMealByID(*order.WednesdayMealID)
-		if err == nil {
-			order.WednesdayMeal = meal
-		}
-	}
-
-	if order.ThursdayMealID != nil {
-		meal, err := r.mealRepository.GetMealByID(*order.ThursdayMealID)
-		if err == nil {
-			order.ThursdayMeal = meal
-		}
-	}
-
+	order.Items = items
 	return &order, nil
 }
 

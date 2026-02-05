@@ -61,14 +61,38 @@ func (h *MealOrderHandler) HandleCreateMealOrder(context *gin.Context) {
 		return
 	}
 
+	// Convert the denormalized request to normalized items
+	items := []repository.MealOrderItem{}
+	if request.MondayMealID != nil {
+		items = append(items, repository.MealOrderItem{
+			DayOfWeek: "Monday",
+			MealID:    *request.MondayMealID,
+		})
+	}
+	if request.TuesdayMealID != nil {
+		items = append(items, repository.MealOrderItem{
+			DayOfWeek: "Tuesday",
+			MealID:    *request.TuesdayMealID,
+		})
+	}
+	if request.WednesdayMealID != nil {
+		items = append(items, repository.MealOrderItem{
+			DayOfWeek: "Wednesday",
+			MealID:    *request.WednesdayMealID,
+		})
+	}
+	if request.ThursdayMealID != nil {
+		items = append(items, repository.MealOrderItem{
+			DayOfWeek: "Thursday",
+			MealID:    *request.ThursdayMealID,
+		})
+	}
+
 	// Create the meal order
 	order := &repository.MealOrder{
-		UserID:          userID,
-		WeekStartDate:   request.WeekStartDate,
-		MondayMealID:    request.MondayMealID,
-		TuesdayMealID:   request.TuesdayMealID,
-		WednesdayMealID: request.WednesdayMealID,
-		ThursdayMealID:  request.ThursdayMealID,
+		UserID:        userID,
+		WeekStartDate: request.WeekStartDate,
+		Items:         items,
 	}
 
 	err = h.mealOrderService.CreateMealOrder(order)
@@ -125,59 +149,32 @@ func (h *MealOrderHandler) HandleGetMealOrder(context *gin.Context) {
 		return
 	}
 
-	// Convert to response format
+	// Convert normalized structure to denormalized response format
 	response := models.MealOrderResponse{
 		ID:            order.ID,
 		WeekStartDate: order.WeekStartDate,
 	}
 
-	// Load meal details using GetMealByID for better performance
-	if order.MondayMealID != nil {
-		meal, err := h.mealService.GetMealByID(*order.MondayMealID)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, models.ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      "Failed to load Monday meal details: " + err.Error(),
-			})
-			return
+	// Map items to the denormalized response structure
+	for _, item := range order.Items {
+		if item.Meal != nil {
+			mealResponse := &models.MealResponse{
+				ID:          item.Meal.ID,
+				Description: item.Meal.Description,
+				Date:        item.Meal.Date,
+			}
+			
+			switch item.DayOfWeek {
+			case "Monday":
+				response.MondayMeal = mealResponse
+			case "Tuesday":
+				response.TuesdayMeal = mealResponse
+			case "Wednesday":
+				response.WednesdayMeal = mealResponse
+			case "Thursday":
+				response.ThursdayMeal = mealResponse
+			}
 		}
-		response.MondayMeal = meal
-	}
-
-	if order.TuesdayMealID != nil {
-		meal, err := h.mealService.GetMealByID(*order.TuesdayMealID)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, models.ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      "Failed to load Tuesday meal details: " + err.Error(),
-			})
-			return
-		}
-		response.TuesdayMeal = meal
-	}
-
-	if order.WednesdayMealID != nil {
-		meal, err := h.mealService.GetMealByID(*order.WednesdayMealID)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, models.ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      "Failed to load Wednesday meal details: " + err.Error(),
-			})
-			return
-		}
-		response.WednesdayMeal = meal
-	}
-
-	if order.ThursdayMealID != nil {
-		meal, err := h.mealService.GetMealByID(*order.ThursdayMealID)
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, models.ApiResult{
-				StatusCode: http.StatusInternalServerError,
-				Error:      "Failed to load Thursday meal details: " + err.Error(),
-			})
-			return
-		}
-		response.ThursdayMeal = meal
 	}
 
 	context.JSON(http.StatusOK, models.ApiResult{

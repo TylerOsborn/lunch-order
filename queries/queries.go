@@ -82,8 +82,14 @@ var GetRequestMeals string
 //go:embed meal_order/create_meal_order.sql
 var CreateMealOrder string
 
+//go:embed meal_order/create_meal_order_item.sql
+var CreateMealOrderItem string
+
 //go:embed meal_order/get_meal_order_by_user_and_week.sql
 var GetMealOrderByUserAndWeek string
 
 //go:embed meal_order/get_meal_order_by_id.sql
 var GetMealOrderByID string
+
+//go:embed meal_order/get_meal_order_items.sql
+var GetMealOrderItems string
