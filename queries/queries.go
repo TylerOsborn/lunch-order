@@ -15,6 +15,9 @@ var GetMealsByDate string
 //go:embed meal/get_meals_by_range.sql
 var GetMealsByRange string
 
+//go:embed meal/get_meal_by_id.sql
+var GetMealByID string
+
 // User
 //go:embed user/create_user.sql
 var CreateUser string
@@ -74,3 +77,13 @@ var GetRequestsByRequester string
 
 //go:embed donation_request/get_request_meals.sql
 var GetRequestMeals string
+
+// Meal Order
+//go:embed meal_order/create_meal_order.sql
+var CreateMealOrder string
+
+//go:embed meal_order/get_meal_order_by_user_and_week.sql
+var GetMealOrderByUserAndWeek string
+
+//go:embed meal_order/get_meal_order_by_id.sql
+var GetMealOrderByID string

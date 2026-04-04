@@ -35,3 +35,20 @@ export interface MealPreference {
   description: string;
   selected: boolean;
 }
+
+export interface MealOrder {
+  id: number;
+  weekStartDate: string;
+  mondayMeal: Meal | null;
+  tuesdayMeal: Meal | null;
+  wednesdayMeal: Meal | null;
+  thursdayMeal: Meal | null;
+}
+
+export interface MealOrderRequest {
+  weekStartDate: string;
+  mondayMealId: number | null;
+  tuesdayMealId: number | null;
+  wednesdayMealId: number | null;
+  thursdayMealId: number | null;
+}

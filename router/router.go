@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, mealHandler *handlers.MealHandler, donationHandler *handlers.DonationHandler, donationRequestHandler *handlers.DonationRequestHandler, authHandler *handlers.AuthHandler, userRepo *repository.UserRepository) {
+func SetupRoutes(r *gin.Engine, mealHandler *handlers.MealHandler, donationHandler *handlers.DonationHandler, donationRequestHandler *handlers.DonationRequestHandler, authHandler *handlers.AuthHandler, mealOrderHandler *handlers.MealOrderHandler, userRepo *repository.UserRepository) {
 	// Auth routes
 	r.GET("/auth/google/login", authHandler.GoogleLogin)
 	r.GET("/auth/google/callback", authHandler.GoogleCallback)
@@ -34,6 +34,10 @@ func SetupRoutes(r *gin.Engine, mealHandler *handlers.MealHandler, donationHandl
 		api.POST("/DonationRequest", donationRequestHandler.HandleCreateDonationRequest)
 		api.GET("/DonationRequest", donationRequestHandler.HandleGetPendingDonationRequests)
 		api.GET("/DonationRequest/User", donationRequestHandler.HandleGetUserDonationRequests)
+
+		// Meal order routes
+		api.POST("/MealOrder", mealOrderHandler.HandleCreateMealOrder)
+		api.GET("/MealOrder", mealOrderHandler.HandleGetMealOrder)
 
 		// Admin routes
 		admin := api.Group("/")

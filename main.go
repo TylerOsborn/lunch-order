@@ -38,23 +38,26 @@ func main() {
 	userRepository := repository.NewUserRepository(db)
 	donationRepository := repository.NewDonationRepository(db, userRepository)
 	donationRequestRepository := repository.NewDonationRequestRepository(db, userRepository, donationRepository)
+	mealOrderRepository := repository.NewMealOrderRepository(db, userRepository, mealRepository)
 
 	// Services
 	donationService := service.NewDonationService(donationRepository, mealRepository, userRepository)
 	mealService := service.NewMealService(mealRepository)
 	donationRequestService := service.NewDonationRequestService(donationRequestRepository, donationRepository, userRepository)
+	mealOrderService := service.NewMealOrderService(mealOrderRepository, mealRepository)
 
 	// Handlers
 	mealHandler := handlers.NewMealHandler(mealService)
 	donationHandler := handlers.NewDonationHandler(donationService, donationRequestService)
 	donationRequestHandler := handlers.NewDonationRequestHandler(donationRequestService)
 	authHandler := handlers.NewAuthHandler(userRepository)
+	mealOrderHandler := handlers.NewMealOrderHandler(mealOrderService, mealService)
 
 	// Route setup
 	r := gin.Default()
 	router.SetupCors(r)
 	router.SetupFrontEnd(r)
-	router.SetupRoutes(r, mealHandler, donationHandler, donationRequestHandler, authHandler, userRepository)
+	router.SetupRoutes(r, mealHandler, donationHandler, donationRequestHandler, authHandler, mealOrderHandler, userRepository)
 
 	// Start server
 	err = r.Run(":8080")

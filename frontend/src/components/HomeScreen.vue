@@ -2,6 +2,7 @@
   <div class="home-screen">
     <h1>Meal Sharing App</h1>
     <div class="flex">
+      <Button @click="$router.push('/order-meal')">Order Meals</Button>
       <Button @click="$router.push('/give-meal')">Give a Meal</Button>
       <Button @click="$router.push('/receive-meal')">Receive a Meal</Button>
     </div>
