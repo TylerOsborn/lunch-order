@@ -127,6 +127,50 @@ func (s *DonationRequestService) UpdateDonationRequestStatus(id uint, status str
 }
 
 func (s *DonationRequestService) CheckAndFulfillDonationRequests() error {
-	return s.donationRequestRepository.CheckAndFulfillDonationRequests()
+	pendingRequests, err := s.donationRequestRepository.GetDonationRequestsByStatus("pending")
+	if err != nil {
+		return err
+	}
+
+	for _, request := range pendingRequests {
+		preferredMeals, err := s.donationRequestRepository.GetDonationRequestMealPreferences(request.ID)
+		if err != nil || len(preferredMeals) == 0 {
+			continue
+		}
+
+		var preferredMealIDs []uint
+		for _, meal := range preferredMeals {
+			preferredMealIDs = append(preferredMealIDs, meal.ID)
+		}
+
+		mealDate := preferredMeals[0].Date
+
+		unclaimedDonations, err := s.donationRepository.GetUnclaimedDonationsByDate(mealDate)
+		if err != nil || len(unclaimedDonations) == 0 {
+			continue
+		}
+
+		var matchingDonation *repository.Donation
+		for i, donation := range unclaimedDonations {
+			for _, preferredMealID := range preferredMealIDs {
+				if donation.MealID == preferredMealID {
+					matchingDonation = &unclaimedDonations[i]
+					break
+				}
+			}
+			if matchingDonation != nil {
+				break
+			}
+		}
+
+		if matchingDonation == nil {
+			continue
+		}
+
+		// Errors on individual fulfillments are non-fatal; continue to next request.
+		_ = s.donationRequestRepository.FulfillRequest(request.ID, matchingDonation.ID, request.RequesterID)
+	}
+
+	return nil
 }
 

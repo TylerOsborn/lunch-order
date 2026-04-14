@@ -37,7 +37,7 @@ func main() {
 	mealRepository := repository.NewMealRepository(db)
 	userRepository := repository.NewUserRepository(db)
 	donationRepository := repository.NewDonationRepository(db, userRepository)
-	donationRequestRepository := repository.NewDonationRequestRepository(db, userRepository, donationRepository)
+	donationRequestRepository := repository.NewDonationRequestRepository(db, userRepository)
 
 	// Services
 	donationService := service.NewDonationService(donationRepository, mealRepository, userRepository)

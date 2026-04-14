@@ -6,18 +6,16 @@ import (
 )
 
 type DonationRequestRepository struct {
-	db                 *sqlx.DB
-	userRepository     *UserRepository
-	donationRepository *DonationRepository
+	db             *sqlx.DB
+	userRepository *UserRepository
 }
 
 var donationRequestRepository *DonationRequestRepository
 
-func NewDonationRequestRepository(db *sqlx.DB, userRepository *UserRepository, donationRepository *DonationRepository) *DonationRequestRepository {
+func NewDonationRequestRepository(db *sqlx.DB, userRepository *UserRepository) *DonationRequestRepository {
 	return &DonationRequestRepository{
-		db:                 db,
-		userRepository:     userRepository,
-		donationRepository: donationRepository,
+		db:             db,
+		userRepository: userRepository,
 	}
 }
 
@@ -46,11 +44,7 @@ func (r *DonationRequestRepository) CreateDonationRequest(requesterID uint, meal
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	return r.CheckAndFulfillDonationRequests()
+	return tx.Commit()
 }
 
 func (r *DonationRequestRepository) GetDonationRequestsByStatus(status string) ([]DonationRequest, error) {
@@ -158,72 +152,20 @@ func (r *DonationRequestRepository) GetDonationRequestMealPreferences(requestID 
 	return meals, err
 }
 
-func (r *DonationRequestRepository) CheckAndFulfillDonationRequests() error {
-	pendingRequests, err := r.GetDonationRequestsByStatus("pending")
+func (r *DonationRequestRepository) FulfillRequest(requestID uint, donationID uint, requesterID uint) error {
+	tx, err := r.db.Beginx()
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
-	for _, request := range pendingRequests {
-		preferredMeals, err := r.GetDonationRequestMealPreferences(request.ID)
-		if err != nil || len(preferredMeals) == 0 {
-			continue
-		}
-
-		var preferredMealIDs []uint
-		for _, meal := range preferredMeals {
-			preferredMealIDs = append(preferredMealIDs, meal.ID)
-		}
-
-		if len(preferredMeals) == 0 {
-			continue
-		}
-		mealDate := preferredMeals[0].Date
-
-		unclaimedDonations, err := r.donationRepository.GetUnclaimedDonationsByDate(mealDate)
-		if err != nil || len(unclaimedDonations) == 0 {
-			continue
-		}
-
-		var matchingDonation *Donation
-		for _, donation := range unclaimedDonations {
-			for _, preferredMealID := range preferredMealIDs {
-				if donation.MealID == preferredMealID {
-					matchingDonation = &donation
-					break
-				}
-			}
-			if matchingDonation != nil {
-				break
-			}
-		}
-
-		if matchingDonation == nil {
-			continue
-		}
-
-		// Fulfill
-		tx, err := r.db.Beginx()
-		if err != nil {
-			return err
-		}
-
-		// Update Donation
-		_, err = tx.Exec(queries.ClaimDonation, request.RequesterID, matchingDonation.ID)
-		if err != nil {
-			tx.Rollback()
-			continue
-		}
-
-		// Update Request
-		_, err = tx.Exec(queries.UpdateRequestStatus, "fulfilled", matchingDonation.ID, request.ID)
-		if err != nil {
-			tx.Rollback()
-			continue
-		}
-
-		tx.Commit()
+	if _, err = tx.Exec(queries.ClaimDonation, requesterID, donationID); err != nil {
+		return err
 	}
 
-	return nil
+	if _, err = tx.Exec(queries.UpdateRequestStatus, "fulfilled", donationID, requestID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
