@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
-import api from '../axios/axios.ts';
-import { ApiResult, DonationClaimSummary, Meal } from '../models/models.ts';
+import api, { apiGet } from '../axios/axios.ts';
+import type { ApiResult } from '../api/types.ts';
+import type { DonationClaimSummary, Meal } from '../models/models.ts';
 import { getSunday, addDays, formatDate } from '../utils/utils.ts';
 
 import Card from 'primevue/card';
@@ -38,11 +39,8 @@ const formattedSummaryDate = computed(() => formatDate(summaryDate.value));
 
 const { data: meals = [] } = useQuery({
   queryKey: ['meals', startDate, endDate],
-  queryFn: async () => {
-    const { data } = await api.get(`/Api/Meal?startDate=${startDate.value}&endDate=${endDate.value}`);
-    const result: ApiResult<Meal[]> = data;
-    return result.data;
-  }
+  queryFn: (): Promise<Meal[]> =>
+    apiGet(`/Api/Meal?startDate=${startDate.value}&endDate=${endDate.value}`),
 });
 
 const prevWeek = () => {

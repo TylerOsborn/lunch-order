@@ -66,9 +66,9 @@ import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import Listbox from "primevue/listbox";
 import { useToast } from 'primevue/usetoast';
-import api from '../axios/axios';
+import { apiGet, apiPost } from '../axios/axios';
 import { setNameCookie } from '../utils/utils';
-import type { ApiResult, Meal, MealPreference } from '../models/models';
+import type { Meal, MealPreference } from '../models/models';
 import { userStore } from '../store/user';
 
 const router = useRouter();
@@ -86,9 +86,7 @@ const {isPending: isAvailableMealTypesPending, data: availableMealTypesData, isE
   queryKey: ['availableMealTypes'],
   queryFn: async (): Promise<Meal[]> => {
     try {
-      const response = await api.get('/Api/Meal/Today');
-      const result: ApiResult<Meal[]> = response.data;
-      return result.data || [];
+      return await apiGet<Meal[]>('/Api/Meal/Today');
     } catch (error) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal types', life: 3000 });
       throw error;
@@ -109,12 +107,9 @@ const mealPreferencesComputed = computed(() => {
 });
 
 const donationRequestMutation = useMutation({
-  mutationFn: async ({ requesterName, mealIds }: { requesterName: string, mealIds: number[] }) => {
+  mutationFn: ({ requesterName, mealIds }: { requesterName: string, mealIds: number[] }) => {
     console.log('Submitting donation request:', { requesterName, mealIds });
-    return await api.post('/Api/DonationRequest', {
-      requesterName: requesterName,
-      mealIds: mealIds
-    });
+    return apiPost('/Api/DonationRequest', { requesterName, mealIds });
   },
   onSuccess: () => {
     isSubmittingRequest.value = false;

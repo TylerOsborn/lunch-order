@@ -69,9 +69,9 @@ import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import {useToast} from 'primevue/usetoast';
-import api from '../axios/axios';
+import { apiGet, apiPost } from '../axios/axios';
 import {setNameCookie} from '../utils/utils';
-import type {ApiResult, Donation} from '../models/models';
+import type {Donation} from '../models/models';
 import { userStore } from '../store/user';
 
 const router = useRouter();
@@ -88,11 +88,9 @@ const {isPending: isChosenMealsPending, data: chosenMealsData, isError: isChosen
   queryKey: ['chosenMeal'],
   queryFn: async (): Promise<Donation | null> => {
     try {
-      const response = await api.get(`/Api/Donation/Claim?name=${name.value}&timestamp=${new Date().getTime()}`);
-      const result: ApiResult<Donation> = response.data;
-      return result.data;
+      return await apiGet<Donation>(`/Api/Donation/Claim?name=${name.value}&timestamp=${new Date().getTime()}`);
     } catch (error: any) {
-      if (error.response.status == 404) {
+      if (error.response?.status == 404) {
         return null;
       }
       throw error;
@@ -106,11 +104,9 @@ const {isPending: isRequestSubmittedPending, data: requestSubmittedData, isError
   queryFn: async (): Promise<Donation[] | null> => {
     try {
       const encodedName = encodeURIComponent(name.value);
-      const response = await api.get(`/Api/DonationRequest/User?name=${encodedName}&date=${new Date().toISOString().split('T')[0]}`);
-      const result: ApiResult<Donation[]> = response.data;
-      return result.data || [];
+      return await apiGet<Donation[]>(`/Api/DonationRequest/User?name=${encodedName}&date=${new Date().toISOString().split('T')[0]}`);
     } catch (error: any) {
-      if (error.response.status == 404) {
+      if (error.response?.status == 404) {
         return null;
       }
       throw error;
@@ -123,9 +119,7 @@ const {isPending: isMealsPending, data: mealsData, isError: isMealsError} = useQ
   queryKey: ['availableMeals'],
   queryFn: async (): Promise<Donation[]> => {
     try {
-      const response = await api.get(`/Api/Donation?timestamp=${new Date().getTime()}`);
-      const result: ApiResult<Donation[]> = response.data;
-      return result.data || [];
+      return await apiGet<Donation[]>(`/Api/Donation?timestamp=${new Date().getTime()}`);
     } catch (error) {
       toast.add({ severity: 'error', summary: 'Error', detail: 'Error loading meal options', life: 3000 });
       throw error;
@@ -136,12 +130,8 @@ const {isPending: isMealsPending, data: mealsData, isError: isMealsError} = useQ
 });
 
 const claimMutation = useMutation({
-  mutationFn: async ({ donationId, name }: { donationId: number, name: string }) => {
-    return await api.post('/Api/Donation/Claim', {
-      donationId,
-      name
-    });
-  },
+  mutationFn: ({ donationId, name }: { donationId: number, name: string }) =>
+    apiPost('/Api/Donation/Claim', { donationId, name }),
   onSuccess: () => {
     dialogVisible.value = true;
     queryClient.invalidateQueries({ queryKey: ['availableMeals'] });

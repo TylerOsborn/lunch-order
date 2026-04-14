@@ -48,12 +48,12 @@
 import {computed, ref} from 'vue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query';
 import { useRouter } from 'vue-router';
-import type { Meal, ApiResult } from '../models/models';
+import type { Meal } from '../models/models';
 import { setNameCookie } from '../utils/utils';
 import Listbox from 'primevue/listbox';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import api from "../axios/axios.ts";
+import { apiGet, apiPost } from "../axios/axios.ts";
 import { useToast } from 'primevue/usetoast';
 import { userStore } from '../store/user';
 
@@ -68,20 +68,16 @@ const selectedMealType = ref(0);
 const userNameInputErrorText = ref('');
 const mealInputErrorText = ref('');
 
-const { isPending, data: mealsResult } = useQuery({
+const { isPending, data: mealsData } = useQuery({
   queryKey: ['meals', 'today'],
-  queryFn: async (): Promise<ApiResult<Meal[]>> => {
-    const response = await api.get('/Api/Meal/Today');
-    return response.data;
-  }
+  queryFn: (): Promise<Meal[]> => apiGet('/Api/Meal/Today'),
 });
 
-const meals = computed(() => mealsResult.value?.data || []);
+const meals = computed(() => mealsData.value || []);
 
 const donationMutation = useMutation({
-  mutationFn: async (donation: { donorName: string; mealId: number }) => {
-    return api.post('/Api/Donation', donation);
-  },
+  mutationFn: (donation: { donorName: string; mealId: number }) =>
+    apiPost('/Api/Donation', donation),
   onSuccess: () => {
     toast.add({
       severity: 'success',

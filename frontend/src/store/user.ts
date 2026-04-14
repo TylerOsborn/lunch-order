@@ -1,4 +1,5 @@
 import { reactive } from 'vue';
+import api from '../axios/axios';
 
 interface User {
   id: number;
@@ -15,9 +16,9 @@ export const userStore = reactive({
   isAuthenticated: false,
   async fetchUser() {
     try {
-      const response = await fetch('/Api/Me');
-      if (response.ok) {
-        this.user = await response.json();
+      const response = await api.get('/Api/Me', { validateStatus: () => true });
+      if (response.status === 200) {
+        this.user = response.data;
         this.isAuthenticated = true;
       } else {
         this.user = null;
@@ -29,14 +30,14 @@ export const userStore = reactive({
     }
   },
   async logout() {
-      try {
-          await fetch('/auth/logout', { method: 'POST' });
-      } catch (e) {
-          console.error(e);
-      } finally {
-          this.user = null;
-          this.isAuthenticated = false;
-          window.location.href = '/login';
-      }
+    try {
+      await api.post('/auth/logout', undefined, { validateStatus: () => true });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      this.user = null;
+      this.isAuthenticated = false;
+      window.location.href = '/login';
+    }
   }
 });
